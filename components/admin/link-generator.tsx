@@ -13,6 +13,7 @@ import {
   ChevronUp,
   Copy,
   ExternalLink,
+  FileText,
   Loader2,
   LogOut,
   Users,
@@ -21,6 +22,7 @@ import {
 } from "lucide-react"
 import { AgentsPanel } from "@/components/admin/agents-panel"
 import { OrdersPanel } from "@/components/admin/orders-panel"
+import { LeadsPanel } from "@/components/admin/leads-panel"
 import {
   PROVIDERS,
   getDefaultAmountsForProvider,
@@ -56,7 +58,7 @@ const PARTNER_TYPE_OPTIONS = [
 
 export function AdminLinkGenerator() {
   const router = useRouter()
-  const [activeTab, setActiveTab] = useState<"link" | "agents" | "orders">("link")
+  const [activeTab, setActiveTab] = useState<"leads" | "link" | "agents" | "orders">("leads")
   // ── Form state
   const [name, setName]               = useState("")
   const [email, setEmail]             = useState("")
@@ -240,6 +242,7 @@ export function AdminLinkGenerator() {
       <div className="border-b border-white/[0.06] bg-[#0d1117]">
         <div className="mx-auto max-w-5xl px-5 flex items-center gap-1">
           {([
+            { key: "leads",  label: "Leads",            icon: FileText },
             { key: "link",   label: "Onboarding Links", icon: Zap },
             { key: "agents", label: "Agents",           icon: Users },
             { key: "orders", label: "Orders",           icon: ShoppingBag },
@@ -261,6 +264,9 @@ export function AdminLinkGenerator() {
       </div>
 
       <div className="mx-auto max-w-5xl px-5 py-10 space-y-8">
+
+        {/* ── Leads tab ── */}
+        {activeTab === "leads" && <LeadsPanel />}
 
         {/* ── Agents tab ── */}
         {activeTab === "agents" && <AgentsPanel />}

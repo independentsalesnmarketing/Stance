@@ -17,8 +17,11 @@ import {
   Trash2,
   UserCircle,
   X,
+  Shield,
+  MapPin,
 } from "lucide-react"
-import type { AgentProfile } from "@/lib/order-types"
+import type { AgentProfile, AgentTier } from "@/lib/order-types"
+import { US_STATES, US_STATE_NAMES } from "@/lib/order-types"
 
 const PARTNER_OPTIONS = [
   { value: "referral",         label: "Referral Partner" },
@@ -37,6 +40,12 @@ function sourceTag(source: string) {
   return source === "onboarding"
     ? <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-violet-400 border border-violet-500/30 bg-violet-500/10 rounded-full px-2 py-0.5">Onboarding</span>
     : <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400 border border-white/10 bg-white/5 rounded-full px-2 py-0.5">Manual</span>
+}
+
+function tierTag(tier?: number) {
+  if (tier === 1) return <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-emerald-400 border border-emerald-500/30 bg-emerald-500/10 rounded-full px-2 py-0.5">Tier 1</span>
+  if (tier === 2) return <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-amber-400 border border-amber-500/30 bg-amber-500/10 rounded-full px-2 py-0.5">Tier 2</span>
+  return <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500 border border-white/10 bg-white/5 rounded-full px-2 py-0.5">No Tier</span>
 }
 
 // ── Select ────────────────────────────────────────────────────────────────────
@@ -160,6 +169,11 @@ export function AgentsPanel() {
       email:     agent.email,
       phone:     agent.phone,
       partnerType: agent.partnerType,
+      tier:      agent.tier,
+      approvedStates: agent.approvedStates || [],
+      activeStatus: agent.activeStatus !== false,
+      directProviderAccess: agent.directProviderAccess || false,
+      canReceiveLeads: agent.canReceiveLeads !== false,
     })
   }
 
@@ -314,7 +328,7 @@ export function AgentsPanel() {
 
             if (isEditing) {
               return (
-                <div key={agent.id} className="rounded-xl border border-blue-500/30 bg-blue-500/[0.05] p-4 space-y-3">
+                <div key={agent.id} className="rounded-xl border border-blue-500/30 bg-blue-500/[0.05] p-4 space-y-3" data-testid={`agent-edit-form-${agent.id}`}>
                   <div className="grid sm:grid-cols-2 gap-3">
                     <Input
                       value={edit.firstName ?? ""}
@@ -350,6 +364,96 @@ export function AgentsPanel() {
                       />
                     </div>
                   </div>
+
+                  {/* Lead Pool Settings */}
+                  <div className="border-t border-blue-500/20 pt-3 mt-3">
+                    <p className="text-[10px] font-bold text-blue-300 uppercase tracking-[0.18em] mb-3 flex items-center gap-1.5">
+                      <Shield className="h-3 w-3" /> Lead Pool Settings
+                    </p>
+                    <div className="grid sm:grid-cols-2 gap-3">
+                      {/* Tier */}
+                      <div>
+                        <Label className="text-slate-400 text-xs mb-1 block">Agent Tier</Label>
+                        <div className="relative">
+                          <select
+                            data-testid={`agent-tier-${agent.id}`}
+                            value={edit.tier ?? ""}
+                            onChange={(e) => setEdit((p) => ({ ...p, tier: e.target.value ? Number(e.target.value) as AgentTier : undefined }))}
+                            className="w-full h-11 rounded-xl border border-white/[0.1] bg-white/[0.04] text-white text-sm px-4 pr-8 appearance-none focus:outline-none focus:border-blue-500/50"
+                          >
+                            <option value="" className="bg-[#111827]">Not set</option>
+                            <option value="1" className="bg-[#111827]">Tier 1 — Direct Provider Access</option>
+                            <option value="2" className="bg-[#111827]">Tier 2 — Website Submission</option>
+                          </select>
+                          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-500 pointer-events-none" />
+                        </div>
+                      </div>
+                      {/* Approved States */}
+                      <div>
+                        <Label className="text-slate-400 text-xs mb-1 block flex items-center gap-1">
+                          <MapPin className="h-3 w-3" /> Approved States
+                        </Label>
+                        <div className="max-h-32 overflow-y-auto rounded-xl border border-white/[0.1] bg-white/[0.04] p-2 space-y-1">
+                          {US_STATES.map((s) => {
+                            const checked = (edit.approvedStates as string[] || []).includes(s)
+                            return (
+                              <label key={s} className="flex items-center gap-2 text-xs cursor-pointer hover:bg-white/[0.04] rounded px-1 py-0.5">
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  onChange={() => {
+                                    setEdit((p) => {
+                                      const states = [...(p.approvedStates || [])]
+                                      const idx = states.indexOf(s)
+                                      if (idx >= 0) states.splice(idx, 1)
+                                      else states.push(s)
+                                      return { ...p, approvedStates: states }
+                                    })
+                                  }}
+                                  className="h-3 w-3 rounded border-white/20 bg-white/[0.05] accent-blue-500"
+                                />
+                                <span className={checked ? "text-white font-semibold" : "text-slate-400"}>{s}</span>
+                              </label>
+                            )
+                          })}
+                        </div>
+                        <p className="text-[10px] text-slate-600 mt-1">
+                          {((edit.approvedStates as string[]) || []).length} state{((edit.approvedStates as string[]) || []).length !== 1 ? "s" : ""} selected
+                        </p>
+                      </div>
+                    </div>
+                    {/* Toggles */}
+                    <div className="grid sm:grid-cols-3 gap-3 mt-3">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={edit.activeStatus !== false}
+                          onChange={(e) => setEdit((p) => ({ ...p, activeStatus: e.target.checked }))}
+                          className="h-4 w-4 rounded border-white/20 bg-white/[0.05] accent-emerald-500"
+                        />
+                        <span className="text-xs text-slate-300">Active</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={edit.directProviderAccess === true}
+                          onChange={(e) => setEdit((p) => ({ ...p, directProviderAccess: e.target.checked }))}
+                          className="h-4 w-4 rounded border-white/20 bg-white/[0.05] accent-emerald-500"
+                        />
+                        <span className="text-xs text-slate-300">Direct Provider Access</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={edit.canReceiveLeads !== false}
+                          onChange={(e) => setEdit((p) => ({ ...p, canReceiveLeads: e.target.checked }))}
+                          className="h-4 w-4 rounded border-white/20 bg-white/[0.05] accent-emerald-500"
+                        />
+                        <span className="text-xs text-slate-300">Can Receive Leads</span>
+                      </label>
+                    </div>
+                  </div>
+
                   <div className="flex gap-2">
                     <Button
                       onClick={saveEdit}
@@ -388,12 +492,21 @@ export function AgentsPanel() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <p className="text-sm font-semibold text-white">{agent.firstName} {agent.lastName}</p>
+                    {tierTag(agent.tier)}
                     {sourceTag(agent.source)}
+                    {agent.activeStatus === false && (
+                      <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-red-400 border border-red-500/30 bg-red-500/10 rounded-full px-2 py-0.5">Inactive</span>
+                    )}
                   </div>
                   <p className="text-xs text-slate-500 mt-0.5 truncate">
                     {partnerLabel(agent.partnerType)} &middot; {agent.email}
                     {agent.phone && ` · ${agent.phone}`}
                   </p>
+                  {agent.approvedStates && agent.approvedStates.length > 0 && (
+                    <p className="text-[10px] text-slate-600 mt-0.5 truncate">
+                      States: {agent.approvedStates.join(", ")}
+                    </p>
+                  )}
                 </div>
 
                 {/* Actions */}

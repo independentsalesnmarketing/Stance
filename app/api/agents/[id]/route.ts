@@ -58,6 +58,12 @@ export async function PATCH(
       ...(body.email      !== undefined && { email:      String(body.email).trim().toLowerCase() }),
       ...(body.phone      !== undefined && { phone:      String(body.phone).trim() }),
       ...(body.partnerType !== undefined && { partnerType: String(body.partnerType) }),
+      ...(body.tier       !== undefined && { tier:       body.tier === "" || body.tier === null ? undefined : Number(body.tier) }),
+      ...(body.approvedStates !== undefined && { approvedStates: Array.isArray(body.approvedStates) ? body.approvedStates : [] }),
+      ...(body.activeStatus !== undefined && { activeStatus: Boolean(body.activeStatus) }),
+      ...(body.directProviderAccess !== undefined && { directProviderAccess: Boolean(body.directProviderAccess) }),
+      ...(body.canReceiveLeads !== undefined && { canReceiveLeads: Boolean(body.canReceiveLeads) }),
+      updatedAt: new Date().toISOString(),
     }
 
     if (updated.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(updated.email)) {

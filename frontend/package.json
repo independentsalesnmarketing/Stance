@@ -1,0 +1,8 @@
+{
+  "name": "stance-frontend-wrapper",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "cd /app && npx next dev -p 3000"
+  }
+}

@@ -1,0 +1,271 @@
+// ──────────────────────────────────────────────────────────────────────────────
+// Stance Marketing — Lead Pool Google Apps Script
+// Deploy as a standalone Web App at script.google.com
+//   Execute as: Me  |  Who has access: Anyone
+// After deploying, copy the web app URL into GOOGLE_LEADS_SCRIPT_URL env var.
+// ──────────────────────────────────────────────────────────────────────────────
+
+function doPost(e) {
+  // Use LockService to prevent race conditions on claim attempts
+  var lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(10000);
+    var data = JSON.parse(e.postData.contents);
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var timestamp = Utilities.formatDate(new Date(), "America/New_York", "M/d/yyyy h:mm a") + " EST";
+    var formType = data.formType || "unknown";
+
+    if (formType === "leadNotification") {
+      sendLeadNotificationEmail(data);
+      appendLeadActivityLog(ss, timestamp, data.leadId, "Agent Notified", "Admin", "", "Notification sent to " + data.agentEmail);
+    } else if (formType === "leadClaimed") {
+      appendLeadToSheet(ss, data, timestamp);
+      sendLeadClaimedAdminEmail(data);
+      appendLeadActivityLog(ss, timestamp, data.leadId, "Lead Claimed", data.claimedByName, data.claimedByEmail, "Lead claimed by " + data.claimedByName);
+    } else if (formType === "leadCreated") {
+      appendLeadToSheet(ss, data, timestamp);
+      appendLeadActivityLog(ss, timestamp, data.leadId, "Lead Created", "Admin", "", "Lead created for " + (data.leadName || ""));
+    }
+
+    lock.releaseLock();
+    return ContentService
+      .createTextOutput(JSON.stringify({ success: true }))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    lock.releaseLock();
+    return ContentService
+      .createTextOutput(JSON.stringify({ success: false, error: err.message }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+// ── Helper: get or create sheet ─────────────────────────────────────────────
+
+function getOrCreateSheet(ss, name, headers) {
+  var sheet = ss.getSheetByName(name);
+  if (!sheet) {
+    sheet = ss.insertSheet(name);
+  }
+  if (sheet.getRange(1, 1).getValue() === "") {
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+    var range = sheet.getRange(1, 1, 1, headers.length);
+    range.setBackground("#0f4c3a");
+    range.setFontColor("#ffffff");
+    range.setFontWeight("bold");
+    range.setFontSize(11);
+    sheet.setFrozenRows(1);
+    for (var i = 1; i <= headers.length; i++) {
+      sheet.setColumnWidth(i, 160);
+    }
+  }
+  // Move Leads sheet to first position if it's the Leads sheet
+  if (name === "Leads") {
+    ss.setActiveSheet(sheet);
+    ss.moveActiveSheet(1);
+  }
+  return sheet;
+}
+
+// ── Shared HTML email wrapper (Stance branded) ──────────────────────────────
+
+function emailWrap(bodyHtml) {
+  return '<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body style="margin:0;padding:0;background:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',Roboto,sans-serif;">'
+    + '<table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:32px 16px;">'
+    + '<tr><td align="center">'
+    + '<table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">'
+    + '<tr><td style="background:#0f172a;border-radius:16px 16px 0 0;padding:28px 32px;">'
+    + '<p style="margin:0;font-size:22px;font-weight:800;color:#ffffff;letter-spacing:0.12em;text-transform:uppercase;">STANCE</p>'
+    + '<p style="margin:4px 0 0;font-size:12px;color:#64748b;letter-spacing:0.08em;text-transform:uppercase;">Independent Sales &amp; Marketing</p>'
+    + '</td></tr>'
+    + '<tr><td style="background:#ffffff;padding:32px;border-radius:0 0 16px 16px;border:1px solid #e2e8f0;border-top:none;">'
+    + bodyHtml
+    + '</td></tr>'
+    + '<tr><td style="padding:20px 0 0;text-align:center;">'
+    + '<p style="margin:0;font-size:11px;color:#94a3b8;">stance-marketing.com &nbsp;·&nbsp; Confidential</p>'
+    + '</td></tr>'
+    + '</table>'
+    + '</td></tr></table></body></html>';
+}
+
+function sectionHeader(label) {
+  return '<p style="margin:24px 0 10px;font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.15em;border-bottom:1px solid #f1f5f9;padding-bottom:6px;">' + label + '</p>';
+}
+
+function row(label, value) {
+  if (!value || value === "—") return '';
+  return '<tr>'
+    + '<td style="padding:5px 0;font-size:13px;color:#64748b;width:38%;vertical-align:top;">' + label + '</td>'
+    + '<td style="padding:5px 0;font-size:13px;color:#1e293b;font-weight:500;">' + value + '</td>'
+    + '</tr>';
+}
+
+// ── Send lead notification email to agent ───────────────────────────────────
+
+function sendLeadNotificationEmail(data) {
+  if (!data.agentEmail) return;
+
+  var firstName = (data.agentName || "").split(" ")[0] || "there";
+  var subject = "Stance — New Lead Available in " + (data.leadState || "your area");
+
+  var bodyHtml = '<h2 style="margin:0 0 4px;font-size:20px;font-weight:700;color:#0f172a;">New Lead Available</h2>'
+    + '<p style="margin:0 0 20px;font-size:14px;color:#475569;">Hi ' + firstName + ', a new lead is available for you to claim.</p>'
+
+    + '<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:20px;margin-bottom:20px;">'
+    + '<table cellpadding="0" cellspacing="0" width="100%">'
+    + row("State", data.leadState)
+    + row("Provider", data.leadProvider)
+    + row("Product", data.leadProduct)
+    + '</table>'
+    + '</div>'
+
+    + '<p style="margin:0 0 12px;font-size:13px;color:#64748b;">Full details will be revealed after you claim this lead. Act fast — only one agent can claim each lead.</p>'
+
+    + '<div style="text-align:center;margin:24px 0;">'
+    + '<a href="' + (data.claimUrl || "#") + '" style="display:inline-block;background:#059669;color:#ffffff;font-size:14px;font-weight:700;text-decoration:none;padding:14px 36px;border-radius:12px;letter-spacing:0.05em;">CLAIM THIS LEAD</a>'
+    + '</div>'
+
+    + '<p style="margin:20px 0 0;font-size:11px;color:#94a3b8;">This link is personal to you. Do not share it.</p>';
+
+  MailApp.sendEmail(data.agentEmail, subject, "", { htmlBody: emailWrap(bodyHtml) });
+}
+
+// ── Send admin notification when lead is claimed ────────────────────────────
+
+function sendLeadClaimedAdminEmail(data) {
+  var recipient = data.adminEmail || "gamblerspassion@gmail.com";
+  var subject = "Stance Lead Claimed — " + (data.leadName || "Unknown") + " (" + (data.leadState || "") + ")";
+
+  var claimedAtFormatted = "";
+  if (data.claimedAt) {
+    try {
+      var d = new Date(data.claimedAt);
+      claimedAtFormatted = Utilities.formatDate(d, "America/New_York", "M/d/yyyy 'at' h:mm a") + " EST";
+    } catch(e) {
+      claimedAtFormatted = data.claimedAt;
+    }
+  }
+
+  var bodyHtml = '<h2 style="margin:0 0 4px;font-size:20px;font-weight:700;color:#0f172a;">Lead Claimed</h2>'
+    + '<p style="margin:0 0 20px;font-size:14px;color:#475569;">A lead has been claimed by an agent.</p>'
+
+    + sectionHeader("Lead Details")
+    + '<table cellpadding="0" cellspacing="0" width="100%">'
+    + row("Lead Name", data.leadName)
+    + row("Lead State", data.leadState)
+    + row("Provider", data.provider)
+    + row("Product Selected", data.productSelected)
+    + '</table>'
+
+    + sectionHeader("Claimed By")
+    + '<table cellpadding="0" cellspacing="0" width="100%">'
+    + row("Agent Name", data.claimedByName)
+    + row("Agent Email", data.claimedByEmail)
+    + row("Date/Time", claimedAtFormatted)
+    + '</table>';
+
+  MailApp.sendEmail(recipient, subject, "", { htmlBody: emailWrap(bodyHtml) });
+}
+
+// ── Append lead to Leads sheet ──────────────────────────────────────────────
+
+function appendLeadToSheet(ss, data, timestamp) {
+  var headers = [
+    "Lead ID", "Created At", "Created By", "Status",
+    "Full Name", "Address", "State", "Email", "Phone", "DOB",
+    "Provider", "Product Selected", "Preferred Install Date", "Preferred Install Time",
+    "Notes", "Eligible Agent IDs", "Notified Agent IDs",
+    "Claimed By Agent ID", "Claimed By Agent Name", "Claimed By Agent Email", "Claimed At",
+    "Removed By", "Removed At", "Admin Notes"
+  ];
+  var sheet = getOrCreateSheet(ss, "Leads", headers);
+
+  // Check if lead already exists (update) or insert new
+  if (data.leadId) {
+    var numRows = sheet.getLastRow() - 1;
+    if (numRows > 0) {
+      var leadIds = sheet.getRange(2, 1, numRows, 1).getValues();
+      for (var i = 0; i < leadIds.length; i++) {
+        if (String(leadIds[i][0]) === String(data.leadId)) {
+          // Update existing row
+          var rowNum = i + 2;
+          if (data.claimedByName) {
+            sheet.getRange(rowNum, 4).setValue("Claimed");
+            sheet.getRange(rowNum, 18).setValue(data.claimedByName || "");
+            sheet.getRange(rowNum, 19).setValue(data.claimedByName || "");
+            sheet.getRange(rowNum, 20).setValue(data.claimedByEmail || "");
+            sheet.getRange(rowNum, 21).setValue(data.claimedAt || timestamp);
+          }
+          return;
+        }
+      }
+    }
+  }
+
+  // Insert new lead
+  sheet.appendRow([
+    data.leadId || "",
+    timestamp,
+    "Admin",
+    data.status || "Unclaimed",
+    data.leadName || data.fullName || "",
+    data.address || "",
+    data.leadState || data.state || "",
+    data.email || "",
+    data.phone || "",
+    data.dob || "",
+    data.provider || data.leadProvider || "",
+    data.productSelected || data.leadProduct || "",
+    data.preferredInstallDate || "",
+    data.preferredInstallTime || "",
+    data.notes || "",
+    "", "", "", "", "", "", "", "", ""
+  ]);
+}
+
+// ── Append to Lead Activity Log sheet ───────────────────────────────────────
+
+function appendLeadActivityLog(ss, timestamp, leadId, action, actorName, actorEmail, details) {
+  var headers = ["Timestamp", "Lead ID", "Action", "Actor Name", "Actor Email", "Details"];
+  var sheet = getOrCreateSheet(ss, "Lead Activity Log", headers);
+  sheet.appendRow([timestamp, leadId, action, actorName, actorEmail, details]);
+}
+
+// ── Agents sheet management ─────────────────────────────────────────────────
+
+function appendAgentToSheet(ss, data, timestamp) {
+  var headers = [
+    "Agent ID", "Agent Name", "Agent Email", "Agent Tier",
+    "Approved States", "Active Status", "Direct Provider Access",
+    "Can Receive Leads", "Created At", "Updated At"
+  ];
+  var sheet = getOrCreateSheet(ss, "Agents", headers);
+  sheet.appendRow([
+    data.agentId || "",
+    data.agentName || "",
+    data.agentEmail || "",
+    data.agentTier || "",
+    data.approvedStates || "",
+    data.activeStatus || "Active",
+    data.directProviderAccess || "No",
+    data.canReceiveLeads || "Yes",
+    timestamp,
+    timestamp
+  ]);
+}
+
+// ── Lead Claim Tokens sheet ─────────────────────────────────────────────────
+
+function appendClaimToken(ss, data, timestamp) {
+  var headers = ["Token", "Lead ID", "Agent ID", "Agent Email", "Created At", "Expires At", "Used At", "Status"];
+  var sheet = getOrCreateSheet(ss, "Lead Claim Tokens", headers);
+  sheet.appendRow([
+    data.token || "",
+    data.leadId || "",
+    data.agentId || "",
+    data.agentEmail || "",
+    timestamp,
+    data.expiresAt || "",
+    "",
+    "Active"
+  ]);
+}
