@@ -1,12 +1,14 @@
 "use client"
 
-import React, { useState, useCallback, useEffect } from "react"
+import React, { useState, useCallback, useEffect, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
   Check,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Copy,
   ExternalLink,
   History,
@@ -14,6 +16,7 @@ import {
   Pencil,
   Plus,
   RefreshCw,
+  Search,
   Trash2,
   UserCircle,
   X,
@@ -90,6 +93,10 @@ export function AgentsPanel() {
   const [editError, setEditError]   = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [edit, setEdit]             = useState<Partial<AgentProfile>>({})
+  const [search, setSearch]         = useState("")
+  const [page, setPage]             = useState(1)
+  const [selected, setSelected]     = useState<Set<string>>(new Set())
+  const [bulkBusy, setBulkBusy]     = useState(false)
 
   // Form state
   const [firstName, setFirstName]   = useState("")
@@ -229,15 +236,55 @@ export function AgentsPanel() {
       err ? "border-red-500/50 focus:border-red-500" : "border-white/[0.1] focus:border-blue-500/50"
     }`
 
+  const PAGE_SIZE = 20
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase()
+    if (!q) return agents
+    return agents.filter((a) =>
+      `${a.firstName} ${a.lastName}`.toLowerCase().includes(q) ||
+      a.email.toLowerCase().includes(q) ||
+      (a.phone || "").includes(q) ||
+      (a.approvedStates || []).some((s: string) => s.toLowerCase().includes(q))
+    )
+  }, [agents, search])
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const safePage = Math.min(page, totalPages)
+  const paged = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
+  useEffect(() => { setPage(1) }, [search])
+
+  const allOnPageSelected = paged.length > 0 && paged.every((a) => selected.has(a.id))
+  const toggleSelectAll = () => {
+    if (allOnPageSelected) setSelected((prev) => { const n = new Set(prev); paged.forEach((a) => n.delete(a.id)); return n })
+    else setSelected((prev) => { const n = new Set(prev); paged.forEach((a) => n.add(a.id)); return n })
+  }
+  const toggleSelect = (id: string) => {
+    setSelected((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
+  }
+  const bulkDeleteAgents = async () => {
+    if (selected.size === 0) return
+    if (!confirm(`Delete ${selected.size} agent${selected.size === 1 ? "" : "s"}?\n\nTheir submitted orders will remain but they will lose access.`)) return
+    setBulkBusy(true)
+    try {
+      for (const id of Array.from(selected)) {
+        await fetch(`/api/agents/${id}`, { method: "DELETE" })
+      }
+      setAgents((prev) => prev.filter((a) => !selected.has(a.id)))
+      setSelected(new Set())
+    } finally {
+      setBulkBusy(false)
+    }
+  }
+
   return (
     <div className="space-y-6">
 
       {/* Header */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <h2 className="text-lg font-bold text-white">Agent Roster</h2>
+          <h2 className="text-lg font-bold text-white" data-testid="agents-panel-title">Agent Roster</h2>
           <p className="text-slate-500 text-sm mt-0.5">
-            Manage agents and generate personal order submission links.
+            {agents.length} agents &middot; Manage agents, tiers, and order submission links.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -257,6 +304,25 @@ export function AgentsPanel() {
             Add Agent
           </Button>
         </div>
+      </div>
+
+      {/* Bulk action bar */}
+      {selected.size > 0 && (
+        <div className="rounded-xl border border-blue-500/30 bg-blue-500/[0.08] px-4 py-2.5 flex items-center gap-3 flex-wrap">
+          <span className="text-sm font-semibold text-blue-200">{selected.size} selected</span>
+          <Button disabled={bulkBusy} onClick={bulkDeleteAgents} data-testid="bulk-delete-agents-btn" className="h-7 px-3 text-[11px] rounded-lg bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 text-red-300 font-semibold">
+            {bulkBusy ? <Loader2 className="h-3 w-3 animate-spin" /> : <><Trash2 className="h-3 w-3 mr-1" />Delete</>}
+          </Button>
+          <Button variant="outline" onClick={() => setSelected(new Set())} className="ml-auto h-7 px-3 text-[11px] border-white/[0.1] bg-transparent text-slate-400 hover:text-white rounded-lg">
+            <X className="h-3 w-3 mr-1" />Clear
+          </Button>
+        </div>
+      )}
+
+      {/* Search */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-500 pointer-events-none" />
+        <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search agents by name, email, state..." className="bg-white/[0.04] border-white/[0.1] text-white placeholder:text-slate-600 h-9 rounded-xl pl-9 text-sm focus:ring-0 focus:border-blue-500/50" />
       </div>
 
       {/* Create form */}
@@ -318,9 +384,21 @@ export function AgentsPanel() {
           <UserCircle className="h-10 w-10 text-slate-700 mx-auto mb-3" />
           <p className="text-slate-500 text-sm">No agents yet. Add one above or wait for onboarding completions.</p>
         </div>
+      ) : filtered.length === 0 ? (
+        <div className="text-center py-16 border border-dashed border-white/10 rounded-2xl">
+          <p className="text-slate-500 text-sm">No agents match your search.</p>
+        </div>
       ) : (
+        <>
+        <div className="flex items-center justify-between gap-3 text-xs text-slate-500">
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <input type="checkbox" checked={allOnPageSelected} onChange={toggleSelectAll} className="h-3.5 w-3.5 rounded border-white/20 bg-white/[0.05] accent-blue-500" />
+            <span>Select all on page</span>
+          </label>
+          <span>Showing {(safePage - 1) * PAGE_SIZE + 1}–{Math.min(safePage * PAGE_SIZE, filtered.length)} of {filtered.length}</span>
+        </div>
         <div className="space-y-2">
-          {agents.map((agent) => {
+          {paged.map((agent) => {
             const orderUrl = `${typeof window !== "undefined" ? window.location.origin : ""}/orders?a=${agent.id}`
             const copied = copiedId === agent.id
             const isEditing = editingId === agent.id
@@ -481,8 +559,11 @@ export function AgentsPanel() {
             return (
               <div
                 key={agent.id}
-                className="rounded-xl border border-white/[0.07] bg-white/[0.02] hover:bg-white/[0.04] transition-colors p-4 flex items-center gap-4 flex-wrap sm:flex-nowrap"
+                data-testid={`agent-row-${agent.id}`}
+                className={`rounded-xl border transition-colors p-4 flex items-center gap-4 flex-wrap sm:flex-nowrap ${selected.has(agent.id) ? "border-blue-500/40 bg-blue-500/[0.06]" : "border-white/[0.07] bg-white/[0.02] hover:bg-white/[0.04]"}`}
               >
+                {/* Select */}
+                <input type="checkbox" checked={selected.has(agent.id)} onChange={() => toggleSelect(agent.id)} className="h-4 w-4 rounded border-white/20 bg-white/[0.05] accent-blue-500 cursor-pointer flex-shrink-0" />
                 {/* Avatar */}
                 <div className="h-10 w-10 rounded-full bg-blue-600/20 border border-blue-500/30 flex items-center justify-center flex-shrink-0 text-blue-300 text-sm font-bold">
                   {agent.firstName[0]}{agent.lastName[0]}
@@ -565,6 +646,20 @@ export function AgentsPanel() {
             )
           })}
         </div>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-center gap-2 pt-2">
+            <Button variant="outline" disabled={safePage <= 1} onClick={() => setPage((p) => p - 1)} className="border-white/[0.1] bg-white/[0.03] text-slate-400 hover:text-white rounded-lg h-8 w-8 px-0">
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <span className="text-xs text-slate-400 px-3">Page {safePage} of {totalPages}</span>
+            <Button variant="outline" disabled={safePage >= totalPages} onClick={() => setPage((p) => p + 1)} className="border-white/[0.1] bg-white/[0.03] text-slate-400 hover:text-white rounded-lg h-8 w-8 px-0">
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
+        </>
       )}
     </div>
   )

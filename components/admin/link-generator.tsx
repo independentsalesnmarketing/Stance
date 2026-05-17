@@ -58,7 +58,7 @@ const PARTNER_TYPE_OPTIONS = [
 
 export function AdminLinkGenerator() {
   const router = useRouter()
-  const [activeTab, setActiveTab] = useState<"leads" | "link" | "agents" | "orders">("leads")
+  const [activeTab, setActiveTab] = useState<"leads" | "link" | "agents" | "orders">("link")
   // ── Form state
   const [name, setName]               = useState("")
   const [email, setEmail]             = useState("")
@@ -242,10 +242,10 @@ export function AdminLinkGenerator() {
       <div className="border-b border-white/[0.06] bg-[#0d1117]">
         <div className="mx-auto max-w-5xl px-5 flex items-center gap-1">
           {([
-            { key: "leads",  label: "Leads",            icon: FileText },
             { key: "link",   label: "Onboarding Links", icon: Zap },
             { key: "agents", label: "Agents",           icon: Users },
             { key: "orders", label: "Orders",           icon: ShoppingBag },
+            { key: "leads",  label: "Leads",            icon: FileText },
           ] as const).map(({ key, label, icon: Icon }) => (
             <button
               key={key}

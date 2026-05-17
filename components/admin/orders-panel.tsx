@@ -3,7 +3,7 @@
 import React, { useState, useCallback, useEffect, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Loader2, RefreshCw, ChevronDown, Search, ExternalLink, Download, Pencil, Trash2, X, Check } from "lucide-react"
+import { Loader2, RefreshCw, ChevronDown, ChevronLeft, ChevronRight, Search, ExternalLink, Download, Pencil, Trash2, X, Check } from "lucide-react"
 import { Label } from "@/components/ui/label"
 import {
   type Order,
@@ -11,6 +11,8 @@ import {
   ORDER_STATUS_LABELS,
   ORDER_STATUS_COLORS,
 } from "@/lib/order-types"
+
+const PAGE_SIZE = 20
 
 const ALL_STATUSES: { value: OrderStatus | "all"; label: string }[] = [
   { value: "all",       label: "All Statuses" },
@@ -29,42 +31,9 @@ function StatusBadge({ status }: { status: OrderStatus }) {
   )
 }
 
-function StatusSelect({
-  value,
-  onChange,
-  disabled,
-}: {
-  value: OrderStatus
-  onChange: (v: OrderStatus) => void
-  disabled?: boolean
-}) {
-  const statuses: OrderStatus[] = ["submitted", "pending", "complete", "paid", "cancelled"]
-  return (
-    <div className="relative">
-      <select
-        value={value}
-        disabled={disabled}
-        onChange={(e) => onChange(e.target.value as OrderStatus)}
-        className="h-8 rounded-lg border border-white/[0.1] bg-white/[0.04] text-white text-xs px-3 pr-7 appearance-none focus:outline-none focus:border-blue-500/50 disabled:opacity-50 cursor-pointer"
-      >
-        {statuses.map((s) => (
-          <option key={s} value={s} className="bg-[#111827]">
-            {ORDER_STATUS_LABELS[s]}
-          </option>
-        ))}
-      </select>
-      <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 text-slate-500 pointer-events-none" />
-    </div>
-  )
-}
-
 function fmt(dateStr: string) {
   if (!dateStr) return "—"
-  return new Date(dateStr).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  })
+  return new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
 }
 
 export function OrdersPanel() {
@@ -79,6 +48,7 @@ export function OrdersPanel() {
   const [editForm, setEditForm]       = useState<Partial<Order>>({})
   const [selected, setSelected]       = useState<Set<string>>(new Set())
   const [bulkBusy, setBulkBusy]       = useState(false)
+  const [page, setPage]               = useState(1)
   const [updateModal, setUpdateModal] = useState<{ order: Order; status: OrderStatus; note: string; notifyAgent: boolean } | null>(null)
 
   const loadOrders = useCallback(async () => {
@@ -173,10 +143,7 @@ export function OrdersPanel() {
     })
   }, [])
 
-  const cancelEdit = useCallback(() => {
-    setEditingId(null)
-    setEditForm({})
-  }, [])
+  const cancelEdit = useCallback(() => { setEditingId(null); setEditForm({}) }, [])
 
   const saveEdit = useCallback(async () => {
     if (!editingId) return
@@ -197,6 +164,7 @@ export function OrdersPanel() {
     }
   }, [editingId, editForm, cancelEdit])
 
+  // ── Delete single order ────────────────────────────────────────────────────
   const deleteOrder = useCallback(async (order: Order) => {
     const label = `${order.customerFirstName} ${order.customerLastName} — ${order.carrier}`.trim()
     if (!confirm(`Permanently delete order for ${label}?\n\nThis cannot be undone.`)) return
@@ -205,9 +173,7 @@ export function OrdersPanel() {
       const res = await fetch(`/api/orders/${order.id}`, { method: "DELETE" })
       if (res.ok) {
         setOrders((prev) => prev.filter((o) => o.id !== order.id))
-        setSelected((prev) => {
-          const next = new Set(prev); next.delete(order.id); return next
-        })
+        setSelected((prev) => { const n = new Set(prev); n.delete(order.id); return n })
         if (expanded === order.id) setExpanded(null)
       }
     } finally {
@@ -215,17 +181,27 @@ export function OrdersPanel() {
     }
   }, [expanded])
 
-  const toggleSelect = useCallback((id: string) => {
-    setSelected((prev) => {
-      const next = new Set(prev)
-      next.has(id) ? next.delete(id) : next.add(id)
-      return next
-    })
-  }, [])
+  // ── Bulk delete ────────────────────────────────────────────────────────────
+  const bulkDelete = useCallback(async () => {
+    if (selected.size === 0) return
+    if (!confirm(`Permanently delete ${selected.size} order${selected.size === 1 ? "" : "s"}?\n\nThis cannot be undone.`)) return
+    setBulkBusy(true)
+    try {
+      const ids = Array.from(selected)
+      for (const id of ids) {
+        await fetch(`/api/orders/${id}`, { method: "DELETE" })
+      }
+      setOrders((prev) => prev.filter((o) => !selected.has(o.id)))
+      setSelected(new Set())
+    } finally {
+      setBulkBusy(false)
+    }
+  }, [selected])
 
+  // ── Bulk status update ─────────────────────────────────────────────────────
   const bulkUpdate = useCallback(async (status: OrderStatus) => {
     if (selected.size === 0) return
-    if (!confirm(`Mark ${selected.size} order${selected.size === 1 ? "" : "s"} as "${status}"?`)) return
+    if (!confirm(`Mark ${selected.size} order${selected.size === 1 ? "" : "s"} as "${ORDER_STATUS_LABELS[status]}"?`)) return
     setBulkBusy(true)
     try {
       const res = await fetch("/api/orders", {
@@ -235,12 +211,7 @@ export function OrdersPanel() {
       })
       if (res.ok) {
         const { updated } = await res.json() as { updated: Order[] }
-        setOrders((prev) =>
-          prev.map((o) => {
-            const u = updated.find((x) => x.id === o.id)
-            return u || o
-          })
-        )
+        setOrders((prev) => prev.map((o) => { const u = updated.find((x) => x.id === o.id); return u || o }))
         setSelected(new Set())
       }
     } finally {
@@ -248,6 +219,11 @@ export function OrdersPanel() {
     }
   }, [selected])
 
+  const toggleSelect = useCallback((id: string) => {
+    setSelected((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
+  }, [])
+
+  // ── Filtering + pagination ─────────────────────────────────────────────────
   const filtered = useMemo(() => {
     const q = search.toLowerCase()
     return orders.filter((o) => {
@@ -263,12 +239,27 @@ export function OrdersPanel() {
     })
   }, [orders, filterStatus, search])
 
-  // Summary counts
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const safePage = Math.min(page, totalPages)
+  const paged = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
+
+  useEffect(() => { setPage(1) }, [search, filterStatus])
+
   const counts = useMemo(() => {
     const c: Record<string, number> = { all: orders.length }
     for (const o of orders) c[o.status] = (c[o.status] || 0) + 1
     return c
   }, [orders])
+
+  // ── Select all on current page ─────────────────────────────────────────────
+  const allOnPageSelected = paged.length > 0 && paged.every((o) => selected.has(o.id))
+  const toggleSelectAll = () => {
+    if (allOnPageSelected) {
+      setSelected((prev) => { const n = new Set(prev); paged.forEach((o) => n.delete(o.id)); return n })
+    } else {
+      setSelected((prev) => { const n = new Set(prev); paged.forEach((o) => n.add(o.id)); return n })
+    }
+  }
 
   return (
     <>
@@ -277,27 +268,18 @@ export function OrdersPanel() {
       {/* Header */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <h2 className="text-lg font-bold text-white">Orders</h2>
+          <h2 className="text-lg font-bold text-white" data-testid="orders-panel-title">Orders</h2>
           <p className="text-slate-500 text-sm mt-0.5">
             {orders.length} total &middot; {counts.submitted ?? 0} new &middot; {counts.pending ?? 0} pending &middot; {counts.paid ?? 0} paid
           </p>
         </div>
         <div className="flex items-center gap-2">
           <a href="/api/orders/export" download>
-            <Button
-              variant="outline"
-              className="border-white/[0.1] bg-white/[0.03] text-slate-400 hover:text-white hover:bg-white/[0.06] rounded-xl h-9 px-3 text-xs"
-            >
-              <Download className="h-3.5 w-3.5 mr-1.5" />
-              Export CSV
+            <Button variant="outline" className="border-white/[0.1] bg-white/[0.03] text-slate-400 hover:text-white hover:bg-white/[0.06] rounded-xl h-9 px-3 text-xs">
+              <Download className="h-3.5 w-3.5 mr-1.5" />Export CSV
             </Button>
           </a>
-          <Button
-            variant="outline"
-            onClick={loadOrders}
-            disabled={loading}
-            className="border-white/[0.1] bg-white/[0.03] text-slate-400 hover:text-white hover:bg-white/[0.06] rounded-xl h-9 px-3"
-          >
+          <Button variant="outline" onClick={loadOrders} disabled={loading} className="border-white/[0.1] bg-white/[0.03] text-slate-400 hover:text-white hover:bg-white/[0.06] rounded-xl h-9 px-3">
             <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
           </Button>
         </div>
@@ -310,50 +292,30 @@ export function OrdersPanel() {
           <span className="text-xs text-slate-500">Mark as:</span>
           <div className="flex items-center gap-1.5 flex-wrap">
             {(["pending", "complete", "paid", "cancelled"] as OrderStatus[]).map((s) => (
-              <Button
-                key={s}
-                disabled={bulkBusy}
-                onClick={() => bulkUpdate(s)}
-                className="h-7 px-3 text-[11px] rounded-lg bg-white/[0.05] hover:bg-white/[0.1] border border-white/[0.1] text-white font-semibold"
-              >
+              <Button key={s} disabled={bulkBusy} onClick={() => bulkUpdate(s)} className="h-7 px-3 text-[11px] rounded-lg bg-white/[0.05] hover:bg-white/[0.1] border border-white/[0.1] text-white font-semibold">
                 {bulkBusy ? <Loader2 className="h-3 w-3 animate-spin" /> : ORDER_STATUS_LABELS[s]}
               </Button>
             ))}
           </div>
-          <Button
-            variant="outline"
-            onClick={() => setSelected(new Set())}
-            className="ml-auto h-7 px-3 text-[11px] border-white/[0.1] bg-transparent text-slate-400 hover:text-white rounded-lg"
-          >
-            <X className="h-3 w-3 mr-1" />
-            Clear
+          <Button disabled={bulkBusy} onClick={bulkDelete} data-testid="bulk-delete-orders-btn" className="h-7 px-3 text-[11px] rounded-lg bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 text-red-300 font-semibold">
+            {bulkBusy ? <Loader2 className="h-3 w-3 animate-spin" /> : <><Trash2 className="h-3 w-3 mr-1" />Delete</>}
+          </Button>
+          <Button variant="outline" onClick={() => setSelected(new Set())} className="ml-auto h-7 px-3 text-[11px] border-white/[0.1] bg-transparent text-slate-400 hover:text-white rounded-lg">
+            <X className="h-3 w-3 mr-1" />Clear
           </Button>
         </div>
       )}
 
       {/* Filters */}
       <div className="flex flex-wrap gap-3">
-        {/* Search */}
         <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-500 pointer-events-none" />
-          <Input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search agent, customer, carrier…"
-            className="bg-white/[0.04] border-white/[0.1] text-white placeholder:text-slate-600 h-9 rounded-xl pl-9 text-sm focus:ring-0 focus:border-blue-500/50"
-          />
+          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search agent, customer, carrier…" className="bg-white/[0.04] border-white/[0.1] text-white placeholder:text-slate-600 h-9 rounded-xl pl-9 text-sm focus:ring-0 focus:border-blue-500/50" />
         </div>
-        {/* Status filter */}
         <div className="relative">
-          <select
-            value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value as OrderStatus | "all")}
-            className="h-9 rounded-xl border border-white/[0.1] bg-white/[0.04] text-white text-sm px-3 pr-8 appearance-none focus:outline-none focus:border-blue-500/50"
-          >
+          <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value as OrderStatus | "all")} className="h-9 rounded-xl border border-white/[0.1] bg-white/[0.04] text-white text-sm px-3 pr-8 appearance-none focus:outline-none focus:border-blue-500/50">
             {ALL_STATUSES.map((s) => (
-              <option key={s.value} value={s.value} className="bg-[#111827]">
-                {s.label}{s.value !== "all" && counts[s.value] ? ` (${counts[s.value]})` : ""}
-              </option>
+              <option key={s.value} value={s.value} className="bg-[#111827]">{s.label}{s.value !== "all" && counts[s.value] ? ` (${counts[s.value]})` : ""}</option>
             ))}
           </select>
           <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-500 pointer-events-none" />
@@ -362,16 +324,22 @@ export function OrdersPanel() {
 
       {/* Table */}
       {loading ? (
-        <div className="flex items-center justify-center py-16">
-          <Loader2 className="h-6 w-6 animate-spin text-slate-500" />
-        </div>
+        <div className="flex items-center justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-slate-500" /></div>
       ) : filtered.length === 0 ? (
-        <div className="text-center py-16 border border-dashed border-white/10 rounded-2xl">
-          <p className="text-slate-500 text-sm">No orders match your filter.</p>
-        </div>
+        <div className="text-center py-16 border border-dashed border-white/10 rounded-2xl"><p className="text-slate-500 text-sm">No orders match your filter.</p></div>
       ) : (
+        <>
+        {/* Select all + pagination header */}
+        <div className="flex items-center justify-between gap-3 text-xs text-slate-500">
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <input type="checkbox" checked={allOnPageSelected} onChange={toggleSelectAll} className="h-3.5 w-3.5 rounded border-white/20 bg-white/[0.05] accent-blue-500" />
+            <span>Select all on page</span>
+          </label>
+          <span>Showing {(safePage - 1) * PAGE_SIZE + 1}–{Math.min(safePage * PAGE_SIZE, filtered.length)} of {filtered.length}</span>
+        </div>
+
         <div className="space-y-2">
-          {filtered.map((order) => {
+          {paged.map((order) => {
             const isOpen = expanded === order.id
             const isEditing = editingId === order.id
             const isSelected = selected.has(order.id)
@@ -379,71 +347,43 @@ export function OrdersPanel() {
             const noteChanged = adminNoteEdit[order.id] !== undefined && adminNoteEdit[order.id] !== order.adminNotes
 
             return (
-              <div
-                key={order.id}
-                className={`rounded-xl border transition-colors ${
-                  isSelected ? "border-blue-500/40 bg-blue-500/[0.06]"
-                  : isOpen ? "border-blue-500/30 bg-blue-500/[0.04]"
-                  : "border-white/[0.07] bg-white/[0.02]"
-                }`}
-              >
-                {/* Row */}
+              <div key={order.id} data-testid={`order-row-${order.id}`} className={`rounded-xl border transition-colors ${isSelected ? "border-blue-500/40 bg-blue-500/[0.06]" : isOpen ? "border-blue-500/30 bg-blue-500/[0.04]" : "border-white/[0.07] bg-white/[0.02]"}`}>
                 <div className="p-4 flex items-center gap-3 flex-wrap sm:flex-nowrap">
-                  <input
-                    type="checkbox"
-                    checked={isSelected}
-                    onChange={() => toggleSelect(order.id)}
-                    onClick={(e) => e.stopPropagation()}
-                    className="h-4 w-4 rounded border-white/20 bg-white/[0.05] accent-blue-500 cursor-pointer flex-shrink-0"
-                  />
-
-                  <button
-                    onClick={() => setExpanded(isOpen ? null : order.id)}
-                    className="flex-1 min-w-0 text-left grid sm:grid-cols-4 gap-y-1 gap-x-4"
-                  >
-                    {/* Agent */}
+                  <input type="checkbox" checked={isSelected} onChange={() => toggleSelect(order.id)} onClick={(e) => e.stopPropagation()} className="h-4 w-4 rounded border-white/20 bg-white/[0.05] accent-blue-500 cursor-pointer flex-shrink-0" />
+                  <button onClick={() => setExpanded(isOpen ? null : order.id)} className="flex-1 min-w-0 text-left grid sm:grid-cols-4 gap-y-1 gap-x-4">
                     <div className="min-w-0">
                       <p className="text-[10px] text-slate-600 uppercase tracking-[0.15em] font-semibold mb-0.5">Agent</p>
                       <p className="text-sm font-semibold text-white truncate">{order.agentName}</p>
                     </div>
-                    {/* Customer */}
                     <div className="min-w-0">
                       <p className="text-[10px] text-slate-600 uppercase tracking-[0.15em] font-semibold mb-0.5">Customer</p>
                       <p className="text-sm text-slate-300 truncate">{order.customerFirstName} {order.customerLastName}</p>
                     </div>
-                    {/* Carrier / Service */}
                     <div className="min-w-0">
                       <p className="text-[10px] text-slate-600 uppercase tracking-[0.15em] font-semibold mb-0.5">Carrier / Plan</p>
-                      <p className="text-sm text-slate-300 truncate">{order.carrier} — {order.service}</p>
+                      <p className="text-sm text-slate-300 truncate">{order.carrier}{order.service ? ` — ${order.service}` : ""}</p>
                     </div>
-                    {/* Date */}
                     <div>
                       <p className="text-[10px] text-slate-600 uppercase tracking-[0.15em] font-semibold mb-0.5">Sale Date</p>
                       <p className="text-sm text-slate-400">{fmt(order.saleDate)}</p>
                     </div>
                   </button>
-
                   <div className="flex items-center gap-2 flex-shrink-0">
-                    {updating === order.id
-                      ? <Loader2 className="h-3.5 w-3.5 animate-spin text-slate-500" />
-                      : (
-                        <button
-                          onClick={(e) => { e.stopPropagation(); openUpdateModal(order) }}
-                          className="flex items-center gap-1.5 rounded-lg px-2 py-1 border border-white/[0.08] bg-white/[0.03] hover:bg-white/[0.07] transition-colors"
-                          title="Update status / note"
-                        >
-                          <StatusBadge status={order.status} />
-                          <Pencil className="h-3 w-3 text-slate-500" />
-                        </button>
-                      )
-                    }
+                    {updating === order.id ? <Loader2 className="h-3.5 w-3.5 animate-spin text-slate-500" /> : (
+                      <button onClick={(e) => { e.stopPropagation(); openUpdateModal(order) }} className="flex items-center gap-1.5 rounded-lg px-2 py-1 border border-white/[0.08] bg-white/[0.03] hover:bg-white/[0.07] transition-colors" title="Update status">
+                        <StatusBadge status={order.status} />
+                        <Pencil className="h-3 w-3 text-slate-500" />
+                      </button>
+                    )}
+                    <Button variant="outline" onClick={(e) => { e.stopPropagation(); deleteOrder(order) }} disabled={updating === order.id} data-testid={`delete-order-btn-${order.id}`} className="border-red-500/20 bg-transparent text-slate-500 hover:text-red-400 hover:border-red-500/40 hover:bg-red-500/[0.06] rounded-xl h-8 w-8 px-0" title="Delete order">
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
                   </div>
                 </div>
 
                 {/* Expanded detail */}
                 {isOpen && !isEditing && (
                   <div className="border-t border-white/[0.07] px-4 pb-5 pt-4 grid sm:grid-cols-2 gap-5">
-                    {/* Left: order details */}
                     <div className="space-y-3 text-sm">
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
@@ -453,40 +393,23 @@ export function OrdersPanel() {
                           <p className="text-slate-500 text-xs mt-0.5">{[order.customerAddress, order.customerCity, order.customerState, order.customerZip].filter(Boolean).join(", ")}</p>
                           {order.customerDob && <p className="text-slate-500 text-xs mt-0.5">DOB: {order.customerDob}</p>}
                           {order.customerSsn && <p className="text-slate-500 text-xs mt-0.5">SSN: {order.customerSsn}</p>}
-                          {order.customerCcNumber && (
-                            <p className="text-slate-500 text-xs mt-0.5">
-                              Card: {order.customerCcNumber}
-                              {order.customerCcExpiry && `  exp ${order.customerCcExpiry}`}
-                              {order.customerCcCvv && `  CVV ${order.customerCcCvv}`}
-                            </p>
-                          )}
+                          {order.customerCcNumber && <p className="text-slate-500 text-xs mt-0.5">Card: {order.customerCcNumber}{order.customerCcExpiry && `  exp ${order.customerCcExpiry}`}{order.customerCcCvv && `  CVV ${order.customerCcCvv}`}</p>}
                         </div>
                         <div className="flex items-center gap-1 flex-shrink-0">
-                          <Button
-                            variant="outline"
-                            onClick={() => startEdit(order)}
-                            className="border-white/[0.1] bg-transparent text-slate-400 hover:text-white hover:bg-white/[0.06] rounded-lg h-8 px-2.5 text-xs"
-                          >
-                            <Pencil className="h-3 w-3 mr-1" />
-                            Edit
+                          <Button variant="outline" onClick={() => startEdit(order)} className="border-white/[0.1] bg-transparent text-slate-400 hover:text-white hover:bg-white/[0.06] rounded-lg h-8 px-2.5 text-xs">
+                            <Pencil className="h-3 w-3 mr-1" />Edit
                           </Button>
-                          <Button
-                            variant="outline"
-                            onClick={() => deleteOrder(order)}
-                            disabled={updating === order.id}
-                            className="border-red-500/30 bg-transparent text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg h-8 w-8 px-0"
-                            title="Delete order"
-                          >
-                            <Trash2 className="h-3 w-3" />
+                          <Button variant="outline" onClick={() => deleteOrder(order)} disabled={updating === order.id} className="border-red-500/30 bg-transparent text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg h-8 px-2.5 text-xs">
+                            <Trash2 className="h-3 w-3 mr-1" />Delete
                           </Button>
                         </div>
                       </div>
                       <div className="grid grid-cols-2 gap-3">
                         {[
                           { label: "Order / Conf #", value: order.orderNumber || "—" },
-                          { label: "Install Date",   value: fmt(order.installDate) },
-                          { label: "Submitted",      value: fmt(order.submittedAt) },
-                          { label: "Last Updated",   value: fmt(order.updatedAt) },
+                          { label: "Install Date", value: fmt(order.installDate) },
+                          { label: "Submitted", value: fmt(order.submittedAt) },
+                          { label: "Last Updated", value: fmt(order.updatedAt) },
                         ].map((r) => (
                           <div key={r.label}>
                             <p className="text-[10px] text-slate-600 uppercase tracking-[0.12em] font-semibold mb-0.5">{r.label}</p>
@@ -494,50 +417,22 @@ export function OrdersPanel() {
                           </div>
                         ))}
                       </div>
-                      {order.notes && (
-                        <div>
-                          <p className="text-[10px] text-slate-600 uppercase tracking-[0.15em] font-semibold mb-1">Agent Notes</p>
-                          <p className="text-slate-400 text-xs leading-relaxed">{order.notes}</p>
-                        </div>
-                      )}
+                      {order.notes && (<div><p className="text-[10px] text-slate-600 uppercase tracking-[0.15em] font-semibold mb-1">Agent Notes</p><p className="text-slate-400 text-xs leading-relaxed">{order.notes}</p></div>)}
                       {order.agentId && (
-                        <a
-                          href={`/orders/history?a=${order.agentId}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300"
-                        >
-                          <ExternalLink className="h-3 w-3" />
-                          View all orders for {order.agentName}
+                        <a href={`/orders/history?a=${order.agentId}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300">
+                          <ExternalLink className="h-3 w-3" />View all orders for {order.agentName}
                         </a>
                       )}
                     </div>
-
-                    {/* Right: admin notes + status */}
                     <div>
                       <p className="text-[10px] text-slate-600 uppercase tracking-[0.15em] font-semibold mb-2">Admin Notes</p>
-                      <textarea
-                        rows={4}
-                        value={noteVal}
-                        onChange={(e) =>
-                          setAdminNoteEdit((prev) => ({ ...prev, [order.id]: e.target.value }))
-                        }
-                        placeholder="Internal notes (not visible to agent)…"
-                        className="w-full rounded-xl border border-white/[0.1] bg-white/[0.04] text-white text-sm placeholder:text-slate-600 px-3 py-2 resize-none focus:outline-none focus:border-blue-500/50"
-                      />
+                      <textarea rows={4} value={noteVal} onChange={(e) => setAdminNoteEdit((prev) => ({ ...prev, [order.id]: e.target.value }))} placeholder="Internal notes (not visible to agent)…" className="w-full rounded-xl border border-white/[0.1] bg-white/[0.04] text-white text-sm placeholder:text-slate-600 px-3 py-2 resize-none focus:outline-none focus:border-blue-500/50" />
                       {noteChanged && (
-                        <Button
-                          onClick={() => saveNote(order.id)}
-                          disabled={updating === order.id}
-                          className="mt-2 h-8 px-4 text-xs rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-semibold"
-                        >
+                        <Button onClick={() => saveNote(order.id)} disabled={updating === order.id} className="mt-2 h-8 px-4 text-xs rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-semibold">
                           {updating === order.id ? <><Loader2 className="h-3 w-3 mr-1 animate-spin" />Saving…</> : "Save Note"}
                         </Button>
                       )}
-                      <div className="mt-3">
-                        <p className="text-[10px] text-slate-600 uppercase tracking-[0.15em] font-semibold mb-2">Status</p>
-                        <StatusBadge status={order.status} />
-                      </div>
+                      <div className="mt-3"><p className="text-[10px] text-slate-600 uppercase tracking-[0.15em] font-semibold mb-2">Status</p><StatusBadge status={order.status} /></div>
                     </div>
                   </div>
                 )}
@@ -547,14 +442,7 @@ export function OrdersPanel() {
                   <div className="border-t border-blue-500/20 px-4 pb-5 pt-4 bg-blue-500/[0.02]">
                     <div className="flex items-center justify-between mb-4">
                       <h4 className="text-sm font-bold text-blue-300 uppercase tracking-[0.18em]">Edit Order</h4>
-                      <Button
-                        variant="outline"
-                        onClick={cancelEdit}
-                        className="border-white/[0.1] bg-transparent text-slate-400 hover:text-white rounded-lg h-7 px-2 text-xs"
-                      >
-                        <X className="h-3 w-3 mr-1" />
-                        Cancel
-                      </Button>
+                      <Button variant="outline" onClick={cancelEdit} className="border-white/[0.1] bg-transparent text-slate-400 hover:text-white rounded-lg h-7 px-2 text-xs"><X className="h-3 w-3 mr-1" />Cancel</Button>
                     </div>
                     <div className="grid sm:grid-cols-2 gap-3">
                       {[
@@ -572,35 +460,17 @@ export function OrdersPanel() {
                         { k: "saleDate",          l: "Sale date", type: "date" },
                         { k: "installDate",       l: "Install date", type: "date" },
                       ].map(({ k, l, type }) => (
-                        <div key={k}>
-                          <Label className="text-slate-400 text-xs mb-1 block">{l}</Label>
-                          <Input
-                            type={type || "text"}
-                            value={(editForm as any)[k] ?? ""}
-                            onChange={(e) => setEditForm((prev) => ({ ...prev, [k]: e.target.value }))}
-                            className="bg-white/[0.04] border-white/[0.1] text-white h-9 rounded-lg text-sm focus:ring-0 focus:border-blue-500/50"
-                          />
+                        <div key={k}><Label className="text-slate-400 text-xs mb-1 block">{l}</Label>
+                          <Input type={type || "text"} value={(editForm as any)[k] ?? ""} onChange={(e) => setEditForm((prev) => ({ ...prev, [k]: e.target.value }))} className="bg-white/[0.04] border-white/[0.1] text-white h-9 rounded-lg text-sm focus:ring-0 focus:border-blue-500/50" />
                         </div>
                       ))}
-                      <div className="sm:col-span-2">
-                        <Label className="text-slate-400 text-xs mb-1 block">Agent Notes</Label>
-                        <textarea
-                          rows={2}
-                          value={editForm.notes ?? ""}
-                          onChange={(e) => setEditForm((prev) => ({ ...prev, notes: e.target.value }))}
-                          className="w-full rounded-lg border border-white/[0.1] bg-white/[0.04] text-white text-sm px-3 py-2 resize-none focus:outline-none focus:border-blue-500/50"
-                        />
+                      <div className="sm:col-span-2"><Label className="text-slate-400 text-xs mb-1 block">Agent Notes</Label>
+                        <textarea rows={2} value={editForm.notes ?? ""} onChange={(e) => setEditForm((prev) => ({ ...prev, notes: e.target.value }))} className="w-full rounded-lg border border-white/[0.1] bg-white/[0.04] text-white text-sm px-3 py-2 resize-none focus:outline-none focus:border-blue-500/50" />
                       </div>
                     </div>
                     <div className="flex gap-2 mt-4">
-                      <Button
-                        onClick={saveEdit}
-                        disabled={updating === order.id}
-                        className="bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-lg h-9 px-5 text-sm"
-                      >
-                        {updating === order.id
-                          ? <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />Saving…</>
-                          : <><Check className="h-3.5 w-3.5 mr-1.5" />Save Changes</>}
+                      <Button onClick={saveEdit} disabled={updating === order.id} className="bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-lg h-9 px-5 text-sm">
+                        {updating === order.id ? <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />Saving…</> : <><Check className="h-3.5 w-3.5 mr-1.5" />Save Changes</>}
                       </Button>
                     </div>
                   </div>
@@ -609,6 +479,20 @@ export function OrdersPanel() {
             )
           })}
         </div>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-center gap-2 pt-2">
+            <Button variant="outline" disabled={safePage <= 1} onClick={() => setPage((p) => p - 1)} className="border-white/[0.1] bg-white/[0.03] text-slate-400 hover:text-white rounded-lg h-8 w-8 px-0">
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <span className="text-xs text-slate-400 px-3">Page {safePage} of {totalPages}</span>
+            <Button variant="outline" disabled={safePage >= totalPages} onClick={() => setPage((p) => p + 1)} className="border-white/[0.1] bg-white/[0.03] text-slate-400 hover:text-white rounded-lg h-8 w-8 px-0">
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
+        </>
       )}
     </div>
 
@@ -616,94 +500,36 @@ export function OrdersPanel() {
     {updateModal && (() => {
       const m = updateModal
       return (
-      <div
-        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
-        onClick={() => setUpdateModal(null)}
-      >
-        <div
-          className="bg-[#0d1117] border border-white/[0.12] rounded-2xl w-full max-w-md shadow-2xl"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {/* Header */}
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setUpdateModal(null)}>
+        <div className="bg-[#0d1117] border border-white/[0.12] rounded-2xl w-full max-w-md shadow-2xl" onClick={(e) => e.stopPropagation()}>
           <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-white/[0.07]">
-            <div>
-              <h3 className="text-sm font-bold text-white">Update Order</h3>
-              <p className="text-xs text-slate-500 mt-0.5">
-                {m.order.customerFirstName} {m.order.customerLastName}
-                {" · "}{m.order.carrier}
-                {m.order.service ? ` — ${m.order.service}` : ""}
-              </p>
-            </div>
-            <button onClick={() => setUpdateModal(null)} className="text-slate-500 hover:text-white transition-colors">
-              <X className="h-4 w-4" />
-            </button>
+            <div><h3 className="text-sm font-bold text-white">Update Order</h3><p className="text-xs text-slate-500 mt-0.5">{m.order.customerFirstName} {m.order.customerLastName} · {m.order.carrier}{m.order.service ? ` — ${m.order.service}` : ""}</p></div>
+            <button onClick={() => setUpdateModal(null)} className="text-slate-500 hover:text-white transition-colors"><X className="h-4 w-4" /></button>
           </div>
-
-          {/* Body */}
           <div className="px-5 py-4 space-y-4">
             <div>
               <Label className="text-slate-400 text-xs mb-1.5 block uppercase tracking-[0.12em]">Status</Label>
               <div className="relative">
-                <select
-                  value={m.status}
-                  onChange={(e) =>
-                    setUpdateModal((prev) => prev ? { ...prev, status: e.target.value as OrderStatus } : null)
-                  }
-                  className="w-full h-9 rounded-lg border border-white/[0.1] bg-white/[0.04] text-white text-sm px-3 pr-8 appearance-none focus:outline-none focus:border-blue-500/50"
-                >
-                  {(["submitted", "pending", "complete", "paid", "cancelled"] as OrderStatus[]).map((s) => (
-                    <option key={s} value={s} className="bg-[#111827]">{ORDER_STATUS_LABELS[s]}</option>
-                  ))}
+                <select value={m.status} onChange={(e) => setUpdateModal((prev) => prev ? { ...prev, status: e.target.value as OrderStatus } : null)} className="w-full h-9 rounded-lg border border-white/[0.1] bg-white/[0.04] text-white text-sm px-3 pr-8 appearance-none focus:outline-none focus:border-blue-500/50">
+                  {(["submitted", "pending", "complete", "paid", "cancelled"] as OrderStatus[]).map((s) => (<option key={s} value={s} className="bg-[#111827]">{ORDER_STATUS_LABELS[s]}</option>))}
                 </select>
                 <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-500 pointer-events-none" />
               </div>
             </div>
             <div>
-              <Label className="text-slate-400 text-xs mb-1.5 block uppercase tracking-[0.12em]">
-                Note <span className="normal-case tracking-normal text-slate-600">(optional — internal only)</span>
-              </Label>
-              <textarea
-                rows={3}
-                value={m.note}
-                onChange={(e) =>
-                  setUpdateModal((prev) => prev ? { ...prev, note: e.target.value } : null)
-                }
-                placeholder="Add an internal note…"
-                className="w-full rounded-lg border border-white/[0.1] bg-white/[0.04] text-white text-sm placeholder:text-slate-600 px-3 py-2 resize-none focus:outline-none focus:border-blue-500/50"
-              />
+              <Label className="text-slate-400 text-xs mb-1.5 block uppercase tracking-[0.12em]">Note <span className="normal-case tracking-normal text-slate-600">(optional)</span></Label>
+              <textarea rows={3} value={m.note} onChange={(e) => setUpdateModal((prev) => prev ? { ...prev, note: e.target.value } : null)} placeholder="Add an internal note…" className="w-full rounded-lg border border-white/[0.1] bg-white/[0.04] text-white text-sm placeholder:text-slate-600 px-3 py-2 resize-none focus:outline-none focus:border-blue-500/50" />
             </div>
-            {/* Notify toggle */}
             <label className="flex items-center gap-2.5 cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={m.notifyAgent}
-                onChange={(e) =>
-                  setUpdateModal((prev) => prev ? { ...prev, notifyAgent: e.target.checked } : null)
-                }
-                className="h-4 w-4 rounded border-white/20 bg-white/[0.05] accent-blue-500"
-              />
+              <input type="checkbox" checked={m.notifyAgent} onChange={(e) => setUpdateModal((prev) => prev ? { ...prev, notifyAgent: e.target.checked } : null)} className="h-4 w-4 rounded border-white/20 bg-white/[0.05] accent-blue-500" />
               <span className="text-sm text-slate-300">Email agent about this update</span>
             </label>
           </div>
-
-          {/* Footer */}
           <div className="flex items-center gap-2 px-5 pb-5">
-            <Button
-              onClick={saveModalUpdate}
-              disabled={!!updating}
-              className="flex-1 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-lg h-9 text-sm"
-            >
-              {updating
-                ? <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />Saving…</>
-                : <><Check className="h-3.5 w-3.5 mr-1.5" />Save</>}
+            <Button onClick={saveModalUpdate} disabled={!!updating} className="flex-1 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-lg h-9 text-sm">
+              {updating ? <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />Saving…</> : <><Check className="h-3.5 w-3.5 mr-1.5" />Save</>}
             </Button>
-            <Button
-              variant="outline"
-              onClick={() => setUpdateModal(null)}
-              className="border-white/[0.1] bg-transparent text-slate-400 hover:text-white rounded-lg h-9 px-4 text-sm"
-            >
-              Cancel
-            </Button>
+            <Button variant="outline" onClick={() => setUpdateModal(null)} className="border-white/[0.1] bg-transparent text-slate-400 hover:text-white rounded-lg h-9 px-4 text-sm">Cancel</Button>
           </div>
         </div>
       </div>
