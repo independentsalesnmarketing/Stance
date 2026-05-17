@@ -85,9 +85,10 @@ export async function POST(
       notifiedAgents.push({ name: `${agent.firstName} ${agent.lastName}`, email: agent.email })
     }
 
-    // Update lead with notified agent IDs
-    lead.eligibleAgentIds = [...new Set([...lead.eligibleAgentIds, ...agentIds])]
-    lead.notifiedAgentIds = [...new Set([...lead.notifiedAgentIds, ...agentIds])]
+    // Update lead with only successfully notified agent IDs
+    const successAgentIds = tokens.map(t => t.agentId)
+    lead.eligibleAgentIds = [...new Set([...lead.eligibleAgentIds, ...successAgentIds])]
+    lead.notifiedAgentIds = [...new Set([...lead.notifiedAgentIds, ...successAgentIds])]
     lead.updatedAt = now
 
     await put(`leads/${id}.json`, JSON.stringify(lead), {
