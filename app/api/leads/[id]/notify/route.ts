@@ -8,7 +8,7 @@ async function loadLead(id: string): Promise<Lead | null> {
   const { blobs } = await list({ prefix: `leads/${id}.json` })
   const match = blobs.find((b) => b.pathname === `leads/${id}.json`)
   if (!match) return null
-  const res = await fetch(match.url, { cache: "no-store" })
+  const res = await fetch(`${match.url}?t=${Date.now()}`, { cache: "no-store" })
   if (!res.ok) return null
   return res.json() as Promise<Lead>
 }
@@ -16,7 +16,7 @@ async function loadLead(id: string): Promise<Lead | null> {
 async function loadAgent(id: string): Promise<AgentProfile | null> {
   const { blobs } = await list({ prefix: `agent-profiles/${id}.json` })
   if (!blobs.length) return null
-  const res = await fetch(blobs[0].url, { cache: "no-store" })
+  const res = await fetch(`${blobs[0].url}?t=${Date.now()}`, { cache: "no-store" })
   if (!res.ok) return null
   return res.json() as Promise<AgentProfile>
 }
@@ -28,6 +28,7 @@ async function logActivity(entry: { timestamp: string; leadId: string; action: s
     contentType: "application/json",
     addRandomSuffix: false,
     allowOverwrite: true,
+    cacheControlMaxAge: 0,
   })
 }
 
@@ -79,6 +80,7 @@ export async function POST(
         contentType: "application/json",
         addRandomSuffix: false,
         allowOverwrite: true,
+        cacheControlMaxAge: 0,
       })
 
       tokens.push(claimToken)
@@ -96,6 +98,7 @@ export async function POST(
       contentType: "application/json",
       addRandomSuffix: false,
       allowOverwrite: true,
+      cacheControlMaxAge: 0,
     })
 
     // Send emails via Google Apps Script

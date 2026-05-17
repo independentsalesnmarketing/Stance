@@ -489,11 +489,12 @@ export function LeadsPanel() {
                 <div key={lead.id} data-testid={`lead-row-${lead.id}`} className={`rounded-xl border transition-colors ${isSelected ? "border-emerald-500/40 bg-emerald-500/[0.06]" : isOpen ? "border-emerald-500/30 bg-emerald-500/[0.04]" : "border-white/[0.07] bg-white/[0.02]"}`}>
                   <div className="p-4 flex items-center gap-3 flex-wrap sm:flex-nowrap">
                     <input type="checkbox" checked={isSelected} onChange={() => toggleSelect(lead.id)} onClick={(e) => e.stopPropagation()} className="h-4 w-4 rounded border-white/20 bg-white/[0.05] accent-emerald-500 cursor-pointer flex-shrink-0" />
-                    <button onClick={() => setExpanded(isOpen ? null : lead.id)} className="flex-1 min-w-0 text-left grid sm:grid-cols-5 gap-y-1 gap-x-4">
+                    <button onClick={() => setExpanded(isOpen ? null : lead.id)} className="flex-1 min-w-0 text-left grid sm:grid-cols-6 gap-y-1 gap-x-4">
                       <div className="min-w-0"><p className="text-[10px] text-slate-600 uppercase tracking-[0.15em] font-semibold mb-0.5">Name</p><p className="text-sm font-semibold text-white truncate">{lead.fullName || "—"}</p></div>
                       <div className="min-w-0"><p className="text-[10px] text-slate-600 uppercase tracking-[0.15em] font-semibold mb-0.5">State</p><p className="text-sm text-slate-300">{lead.state || "—"}</p></div>
                       <div className="min-w-0"><p className="text-[10px] text-slate-600 uppercase tracking-[0.15em] font-semibold mb-0.5">Provider</p><p className="text-sm text-slate-300 truncate">{lead.provider || "—"}</p></div>
                       <div className="min-w-0"><p className="text-[10px] text-slate-600 uppercase tracking-[0.15em] font-semibold mb-0.5">Product</p><p className="text-sm text-slate-300 truncate">{lead.productSelected || "—"}</p></div>
+                      <div className="min-w-0"><p className="text-[10px] text-slate-600 uppercase tracking-[0.15em] font-semibold mb-0.5">Order #</p><p className={`text-sm font-mono truncate ${lead.orderNumber ? "text-violet-300" : "text-slate-600"}`} data-testid={`lead-list-order-${lead.id}`}>{lead.orderNumber || "—"}</p></div>
                       <div><p className="text-[10px] text-slate-600 uppercase tracking-[0.15em] font-semibold mb-0.5">Created</p><p className="text-sm text-slate-400">{lead.createdAt ? new Date(lead.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "—"}</p></div>
                     </button>
                     <div className="flex items-center gap-2 flex-shrink-0">

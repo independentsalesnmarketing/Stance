@@ -8,7 +8,7 @@ async function loadToken(token: string): Promise<LeadClaimToken | null> {
   const { blobs } = await list({ prefix: `leads/tokens/${token}.json` })
   const match = blobs.find((b) => b.pathname === `leads/tokens/${token}.json`)
   if (!match) return null
-  const res = await fetch(match.url, { cache: "no-store" })
+  const res = await fetch(`${match.url}?t=${Date.now()}`, { cache: "no-store" })
   if (!res.ok) return null
   return res.json() as Promise<LeadClaimToken>
 }
@@ -17,7 +17,7 @@ async function loadLead(id: string): Promise<Lead | null> {
   const { blobs } = await list({ prefix: `leads/${id}.json` })
   const match = blobs.find((b) => b.pathname === `leads/${id}.json`)
   if (!match) return null
-  const res = await fetch(match.url, { cache: "no-store" })
+  const res = await fetch(`${match.url}?t=${Date.now()}`, { cache: "no-store" })
   if (!res.ok) return null
   return res.json() as Promise<Lead>
 }
@@ -25,7 +25,7 @@ async function loadLead(id: string): Promise<Lead | null> {
 async function loadAgent(id: string): Promise<AgentProfile | null> {
   const { blobs } = await list({ prefix: `agent-profiles/${id}.json` })
   if (!blobs.length) return null
-  const res = await fetch(blobs[0].url, { cache: "no-store" })
+  const res = await fetch(`${blobs[0].url}?t=${Date.now()}`, { cache: "no-store" })
   if (!res.ok) return null
   return res.json() as Promise<AgentProfile>
 }
@@ -37,6 +37,7 @@ async function logActivity(entry: { timestamp: string; leadId: string; action: s
     contentType: "application/json",
     addRandomSuffix: false,
     allowOverwrite: true,
+    cacheControlMaxAge: 0,
   })
 }
 
@@ -172,6 +173,7 @@ export async function POST(
         contentType: "application/json",
         addRandomSuffix: false,
         allowOverwrite: true,
+        cacheControlMaxAge: 0,
       })
       return NextResponse.json({
         success: false,
@@ -228,6 +230,7 @@ export async function POST(
       contentType: "application/json",
       addRandomSuffix: false,
       allowOverwrite: true,
+      cacheControlMaxAge: 0,
     })
 
     // Mark token as used
@@ -238,6 +241,7 @@ export async function POST(
       contentType: "application/json",
       addRandomSuffix: false,
       allowOverwrite: true,
+      cacheControlMaxAge: 0,
     })
 
     // Revoke all other tokens for this lead
@@ -245,7 +249,7 @@ export async function POST(
     for (const blob of tokenBlobs) {
       if (blob.pathname === `leads/tokens/${token}.json`) continue
       try {
-        const res = await fetch(blob.url, { cache: "no-store" })
+        const res = await fetch(`${blob.url}?t=${Date.now()}`, { cache: "no-store" })
         const otherToken = await res.json() as LeadClaimToken
         if (otherToken.leadId === lead.id && otherToken.status === "active") {
           otherToken.status = "revoked"
@@ -254,6 +258,7 @@ export async function POST(
             contentType: "application/json",
             addRandomSuffix: false,
             allowOverwrite: true,
+            cacheControlMaxAge: 0,
           })
         }
       } catch {}

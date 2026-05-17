@@ -15,7 +15,7 @@ export async function GET() {
     const { blobs } = await list({ prefix: "orders/" })
     const orders = await Promise.all(
       blobs.map(async (blob) => {
-        const res = await fetch(blob.url, { cache: "no-store" })
+        const res = await fetch(`${blob.url}?t=${Date.now()}`, { cache: "no-store" })
         return res.json() as Promise<Order>
       })
     )
@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
     for (const id of ids) {
       const { blobs } = await list({ prefix: `orders/${id}.json` })
       if (!blobs.length) continue
-      const res = await fetch(blobs[0].url, { cache: "no-store" })
+      const res = await fetch(`${blobs[0].url}?t=${Date.now()}`, { cache: "no-store" })
       if (!res.ok) continue
       const order = await res.json() as Order
       const next: Order = { ...order, status, updatedAt: now }
@@ -59,6 +59,7 @@ export async function POST(req: NextRequest) {
         contentType: "application/json",
         addRandomSuffix: false,
         allowOverwrite: true,
+        cacheControlMaxAge: 0,
       })
       updated.push(next)
     }

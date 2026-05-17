@@ -164,6 +164,7 @@ export async function POST(req: Request) {
           contentType: "application/json",
           addRandomSuffix: false,
           allowOverwrite: true,
+          cacheControlMaxAge: 0,
         })
       } catch (blobErr) {
         console.error("Blob storage error:", blobErr)
@@ -213,6 +214,7 @@ export async function POST(req: Request) {
                   contentType: "application/json",
                   addRandomSuffix: false,
                   allowOverwrite: true,
+                  cacheControlMaxAge: 0,
                 })
                 console.log(`Auto-created lead ${leadId} from Tier 2 order ${orderId}`)
               }

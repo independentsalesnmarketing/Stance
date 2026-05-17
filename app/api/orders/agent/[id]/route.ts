@@ -19,7 +19,7 @@ export async function GET(
     const { blobs } = await list({ prefix: "orders/" })
     const all = await Promise.all(
       blobs.map(async (blob) => {
-        const res = await fetch(blob.url, { cache: "no-store" })
+        const res = await fetch(`${blob.url}?t=${Date.now()}`, { cache: "no-store" })
         return res.json() as Promise<Order>
       })
     )

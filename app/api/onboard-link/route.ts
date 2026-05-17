@@ -15,6 +15,7 @@ export async function POST(req: NextRequest) {
       contentType: "application/json",
       addRandomSuffix: false,
       allowOverwrite: true,
+      cacheControlMaxAge: 0,
     })
 
     return NextResponse.json({ id })

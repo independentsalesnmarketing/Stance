@@ -269,6 +269,7 @@ export async function POST(req: Request) {
             contentType: "application/json",
             addRandomSuffix: false,
             allowOverwrite: true,
+            cacheControlMaxAge: 0,
           })
         }
       } catch (agentErr) {

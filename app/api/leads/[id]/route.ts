@@ -10,7 +10,7 @@ async function loadLead(id: string): Promise<Lead | null> {
   const { blobs } = await list({ prefix: `leads/${id}.json` })
   const match = blobs.find((b) => b.pathname === `leads/${id}.json`)
   if (!match) return null
-  const res = await fetch(match.url, { cache: "no-store" })
+  const res = await fetch(`${match.url}?t=${Date.now()}`, { cache: "no-store" })
   if (!res.ok) return null
   return res.json() as Promise<Lead>
 }
@@ -22,6 +22,7 @@ async function logActivity(entry: { timestamp: string; leadId: string; action: s
     contentType: "application/json",
     addRandomSuffix: false,
     allowOverwrite: true,
+    cacheControlMaxAge: 0,
   })
 }
 
@@ -117,6 +118,7 @@ export async function PATCH(
       contentType: "application/json",
       addRandomSuffix: false,
       allowOverwrite: true,
+      cacheControlMaxAge: 0,
     })
 
     if (actionLog) {

@@ -98,7 +98,7 @@ export async function GET(
     if (!blobs.length) {
       return NextResponse.json({ error: "Order not found" }, { status: 404 })
     }
-    const res = await fetch(blobs[0].url, { cache: "no-store" })
+    const res = await fetch(`${blobs[0].url}?t=${Date.now()}`, { cache: "no-store" })
     return NextResponse.json(await res.json() as Order)
   } catch (err) {
     console.error("Order fetch error:", err)
@@ -129,7 +129,7 @@ export async function PATCH(
       return NextResponse.json({ error: "Order not found" }, { status: 404 })
     }
 
-    const res = await fetch(blobs[0].url, { cache: "no-store" })
+    const res = await fetch(`${blobs[0].url}?t=${Date.now()}`, { cache: "no-store" })
     if (!res.ok) {
       return NextResponse.json({ error: "Failed to load order" }, { status: 500 })
     }
@@ -155,6 +155,7 @@ export async function PATCH(
       contentType: "application/json",
       addRandomSuffix: false,
       allowOverwrite: true,
+      cacheControlMaxAge: 0,
     })
 
     // Always update the Google Sheet status column when status changes

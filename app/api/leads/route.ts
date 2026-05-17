@@ -12,7 +12,7 @@ async function loadAllLeads(): Promise<Lead[]> {
     blobs
       .filter((b) => b.pathname.startsWith("leads/") && b.pathname.endsWith(".json") && !b.pathname.includes("/tokens/") && !b.pathname.includes("/activity/"))
       .map(async (blob) => {
-        const res = await fetch(blob.url, { cache: "no-store" })
+        const res = await fetch(`${blob.url}?t=${Date.now()}`, { cache: "no-store" })
         return res.json() as Promise<Lead>
       })
   )
@@ -27,6 +27,7 @@ async function logActivity(entry: Omit<LeadActivityLog, "id">) {
     contentType: "application/json",
     addRandomSuffix: false,
     allowOverwrite: true,
+    cacheControlMaxAge: 0,
   })
 }
 
@@ -93,6 +94,7 @@ export async function POST(req: NextRequest) {
       contentType: "application/json",
       addRandomSuffix: false,
       allowOverwrite: true,
+      cacheControlMaxAge: 0,
     })
 
     await logActivity({

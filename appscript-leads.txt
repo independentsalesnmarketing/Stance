@@ -25,6 +25,14 @@ function doPost(e) {
     } else if (formType === "leadCreated") {
       appendLeadToSheet(ss, data, timestamp);
       appendLeadActivityLog(ss, timestamp, data.leadId, "Lead Created", "Admin", "", "Lead created for " + (data.leadName || ""));
+    } else if (formType === "leadOrderSubmitted") {
+      updateLeadOrderNumber(ss, data, timestamp);
+      sendLeadOrderSubmittedAdminEmail(data);
+      var orderActionLabel = data.previousOrderNumber ? "Order Number Updated" : "Order Number Submitted";
+      var orderDetails = data.previousOrderNumber
+        ? "Order # changed from " + data.previousOrderNumber + " to " + data.orderNumber
+        : "Order # " + data.orderNumber + " submitted by " + (data.agentName || "agent");
+      appendLeadActivityLog(ss, timestamp, data.leadId, orderActionLabel, data.agentName || "Agent", data.agentEmail || "", orderDetails);
     }
 
     lock.releaseLock();
@@ -268,4 +276,76 @@ function appendClaimToken(ss, data, timestamp) {
     "",
     "Active"
   ]);
+}
+
+// ── Send admin notification when an agent submits the order number ──────────
+
+function sendLeadOrderSubmittedAdminEmail(data) {
+  var recipient = data.adminEmail || "gamblerspassion@gmail.com";
+  var isUpdate = !!data.previousOrderNumber;
+  var subject = (isUpdate ? "Stance Order # Updated — " : "Stance Order # Submitted — ")
+    + (data.leadName || "Unknown") + " (" + (data.orderNumber || "") + ")";
+
+  var submittedAtFormatted = "";
+  if (data.submittedAt) {
+    try {
+      var d = new Date(data.submittedAt);
+      submittedAtFormatted = Utilities.formatDate(d, "America/New_York", "M/d/yyyy 'at' h:mm a") + " EST";
+    } catch (e) {
+      submittedAtFormatted = data.submittedAt;
+    }
+  }
+
+  var bodyHtml = '<h2 style="margin:0 0 4px;font-size:20px;font-weight:700;color:#0f172a;">'
+    + (isUpdate ? "Order Number Updated" : "Order Number Submitted")
+    + '</h2>'
+    + '<p style="margin:0 0 20px;font-size:14px;color:#475569;">'
+    + (isUpdate
+        ? "An agent updated the order number for a claimed lead."
+        : "An agent has submitted the carrier order number for a claimed lead. The lead is now marked Completed.")
+    + '</p>'
+
+    + sectionHeader("Order")
+    + '<table cellpadding="0" cellspacing="0" width="100%">'
+    + row("Order Number", data.orderNumber)
+    + (isUpdate ? row("Previous Order #", data.previousOrderNumber) : "")
+    + row("Submitted At", submittedAtFormatted)
+    + '</table>'
+
+    + sectionHeader("Lead")
+    + '<table cellpadding="0" cellspacing="0" width="100%">'
+    + row("Lead Name", data.leadName)
+    + row("State", data.leadState)
+    + row("Provider", data.provider)
+    + row("Product", data.productSelected)
+    + '</table>'
+
+    + sectionHeader("Agent")
+    + '<table cellpadding="0" cellspacing="0" width="100%">'
+    + row("Agent Name", data.agentName)
+    + row("Agent Email", data.agentEmail)
+    + '</table>';
+
+  MailApp.sendEmail(recipient, subject, "", { htmlBody: emailWrap(bodyHtml) });
+}
+
+// ── Update Order # + Status columns in the Leads sheet ──────────────────────
+
+function updateLeadOrderNumber(ss, data, timestamp) {
+  var sheet = ss.getSheetByName("Leads");
+  if (!sheet) return;
+  var numRows = sheet.getLastRow() - 1;
+  if (numRows <= 0) return;
+  var leadIds = sheet.getRange(2, 1, numRows, 1).getValues();
+  for (var i = 0; i < leadIds.length; i++) {
+    if (String(leadIds[i][0]) === String(data.leadId)) {
+      var rowNum = i + 2;
+      sheet.getRange(rowNum, 4).setValue("Completed");                   // Status
+      // Append/overwrite the order number into Admin Notes (column 24)
+      var existingNotes = sheet.getRange(rowNum, 24).getValue() || "";
+      var stamp = "Order # " + (data.orderNumber || "") + " (" + timestamp + ")";
+      sheet.getRange(rowNum, 24).setValue(existingNotes ? (existingNotes + "\n" + stamp) : stamp);
+      return;
+    }
+  }
 }

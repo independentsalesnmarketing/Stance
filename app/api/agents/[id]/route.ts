@@ -75,6 +75,7 @@ export async function PATCH(
       contentType: "application/json",
       addRandomSuffix: false,
       allowOverwrite: true,
+      cacheControlMaxAge: 0,
     })
 
     return NextResponse.json(updated)

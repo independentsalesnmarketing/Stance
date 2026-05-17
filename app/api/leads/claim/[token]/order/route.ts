@@ -8,7 +8,7 @@ async function loadToken(token: string): Promise<LeadClaimToken | null> {
   const { blobs } = await list({ prefix: `leads/tokens/${token}.json` })
   const match = blobs.find((b) => b.pathname === `leads/tokens/${token}.json`)
   if (!match) return null
-  const res = await fetch(match.url, { cache: "no-store" })
+  const res = await fetch(`${match.url}?t=${Date.now()}`, { cache: "no-store" })
   if (!res.ok) return null
   return res.json() as Promise<LeadClaimToken>
 }
@@ -17,7 +17,7 @@ async function loadLead(id: string): Promise<Lead | null> {
   const { blobs } = await list({ prefix: `leads/${id}.json` })
   const match = blobs.find((b) => b.pathname === `leads/${id}.json`)
   if (!match) return null
-  const res = await fetch(match.url, { cache: "no-store" })
+  const res = await fetch(`${match.url}?t=${Date.now()}`, { cache: "no-store" })
   if (!res.ok) return null
   return res.json() as Promise<Lead>
 }
@@ -29,6 +29,7 @@ async function logActivity(entry: { timestamp: string; leadId: string; action: s
     contentType: "application/json",
     addRandomSuffix: false,
     allowOverwrite: true,
+    cacheControlMaxAge: 0,
   })
 }
 
@@ -73,6 +74,7 @@ export async function POST(
       contentType: "application/json",
       addRandomSuffix: false,
       allowOverwrite: true,
+      cacheControlMaxAge: 0,
     })
 
     await logActivity({
@@ -85,6 +87,33 @@ export async function POST(
         ? `Order number changed from ${previousOrder} to ${orderNumber}`
         : `Order number ${orderNumber} submitted; lead marked completed`,
     })
+
+    // Notify admin via Google Apps Script
+    const scriptUrl = process.env.GOOGLE_LEADS_SCRIPT_URL
+    if (scriptUrl) {
+      try {
+        await fetch(scriptUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            formType: "leadOrderSubmitted",
+            adminEmail: "gamblerspassion@gmail.com",
+            leadId: lead.id,
+            leadName: lead.fullName,
+            leadState: lead.state,
+            provider: lead.provider,
+            productSelected: lead.productSelected,
+            orderNumber,
+            previousOrderNumber: previousOrder || "",
+            agentName: lead.claimedByAgentName,
+            agentEmail: lead.claimedByAgentEmail,
+            submittedAt: now,
+          }),
+        })
+      } catch (err) {
+        console.error("Admin order-submitted notification failed:", err)
+      }
+    }
 
     return NextResponse.json({
       success: true,

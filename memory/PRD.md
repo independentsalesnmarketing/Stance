@@ -32,3 +32,12 @@ The provided Vercel Blob token authenticates successfully, **but the Blob store 
 - Unsuspend the Vercel Blob store, then verify end-to-end (create lead → notify → claim → submit order #)
 - Optional: notify admin via Apps Script when an agent submits an order number
 - Optional: surface "Order #" column in the admin leads table list (currently only in expanded view)
+
+## Iteration 2 (2026-01) — Blob unsuspended + optional wins
+- Verified end-to-end via curl: create lead → notify agent (Angelina, IL) → claim via token → submit order # → status flips to completed, order # persists, admin notification + activity log fire
+- Added **`Order #` column** to the Leads list (admin), shows `—` when missing, violet font when present (`lead-list-order-{id}` testid). Grid bumped from 5 → 6 columns
+- Added **admin email notification** when an agent submits an order number. New formType `leadOrderSubmitted` in `/app/appscript-leads.txt` with:
+  - `sendLeadOrderSubmittedAdminEmail()` — branded HTML email summarizing lead + agent + order # (handles both new submit and update)
+  - `updateLeadOrderNumber()` — sheet update that flips Status to "Completed" and appends the order # to admin notes column
+  - User must redeploy the Apps Script for the email to fire (no code change required in app)
+- **CDN cache hardening**: added `cacheControlMaxAge: 0` to all 22 `put()` calls and `?t=${Date.now()}` cache-buster to all blob `fetch()` reads across leads / orders / agents / onboarding. Fixes stale reads after writes — applies project-wide, not just leads
