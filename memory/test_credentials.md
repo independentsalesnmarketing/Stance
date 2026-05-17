@@ -1,16 +1,18 @@
 # Test Credentials
 
 ## Admin Access
-- Admin Password: `stance2024admin`
-- Admin URL: `/admin/login`
+- **URL**: /admin/login
+- **Password**: `stance2024admin`
 
-## Vercel Blob
-- Token: `vercel_blob_rw_pT8HXElw4njf6ED4_YMp9NhNdrVkRuP37fPqU7q7YuTtPyH`
+## Environment Variables
+- **BLOB_READ_WRITE_TOKEN**: vercel_blob_rw_pT8HXElw4njf6ED4_YMp9NhNdrVkRuP37fPqU7q7YuTtPyH
+- **ADMIN_PASSWORD**: stance2024admin
 
-## Notes
-- This is a Next.js app (not React+FastAPI)
-- Frontend runs on port 3000 via Next.js dev server
-- Backend proxy on port 8001
-- All API routes are Next.js API routes
-- External URL: https://877b7d77-ed52-4b92-baf2-5020b5aeb74f.preview.emergentagent.com
-- Google Apps Script email sending is MOCKED (GOOGLE_LEADS_SCRIPT_URL not configured)
+## Test Agent (Configured for Lead Pool)
+- **Name**: Angelina Hines
+- **ID**: 1fa670e1a18c
+- **Email**: angelina.hines87@gmail.com
+- **Tier**: 1 (Direct Provider Access)
+- **Approved States**: IL, OH, IN
+- **Active**: Yes
+- **Can Receive Leads**: Yes
