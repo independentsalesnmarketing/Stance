@@ -67,6 +67,11 @@ export async function POST(req: NextRequest) {
       partnerType: partnerType || "sales-agent",
       createdAt: new Date().toISOString(),
       source: "manual",
+      ...(body.tier !== undefined && body.tier !== "" && body.tier !== null && { tier: Number(body.tier) }),
+      ...(body.approvedStates !== undefined && { approvedStates: Array.isArray(body.approvedStates) ? body.approvedStates : [] }),
+      ...(body.activeStatus !== undefined && { activeStatus: Boolean(body.activeStatus) }),
+      ...(body.directProviderAccess !== undefined && { directProviderAccess: Boolean(body.directProviderAccess) }),
+      ...(body.canReceiveLeads !== undefined && { canReceiveLeads: Boolean(body.canReceiveLeads) }),
     }
 
     await put(`agent-profiles/${id}.json`, JSON.stringify(agent), {

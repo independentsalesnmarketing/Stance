@@ -104,6 +104,11 @@ export function AgentsPanel() {
   const [email, setEmail]           = useState("")
   const [phone, setPhone]           = useState("")
   const [partnerType, setPartnerType] = useState("sales-agent")
+  const [newTier, setNewTier]         = useState<string>("")
+  const [newStates, setNewStates]     = useState<string[]>([])
+  const [newActive, setNewActive]     = useState(true)
+  const [newCanReceive, setNewCanReceive] = useState(true)
+  const [newDirectAccess, setNewDirectAccess] = useState(false)
 
   const loadAgents = useCallback(async () => {
     setLoading(true)
@@ -134,7 +139,14 @@ export function AgentsPanel() {
       const res = await fetch("/api/agents", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ firstName, lastName, email, phone, partnerType }),
+        body: JSON.stringify({
+          firstName, lastName, email, phone, partnerType,
+          tier: newTier ? Number(newTier) : undefined,
+          approvedStates: newStates,
+          activeStatus: newActive,
+          directProviderAccess: newDirectAccess,
+          canReceiveLeads: newCanReceive,
+        }),
       })
       if (!res.ok) {
         const data = await res.json().catch(() => null)
@@ -154,7 +166,7 @@ export function AgentsPanel() {
       } else {
         setShowForm(false)
         setFirstName(""); setLastName(""); setEmail(""); setPhone("")
-        setPartnerType("sales-agent")
+        setPartnerType("sales-agent"); setNewTier(""); setNewStates([]); setNewActive(true); setNewCanReceive(true); setNewDirectAccess(false)
       }
     } finally {
       setSaving(false)
@@ -349,9 +361,40 @@ export function AgentsPanel() {
               <Label className="text-slate-400 text-sm mb-1.5 block">Phone</Label>
               <Input value={phone} onChange={(e) => setPhone(e.target.value)} type="tel" placeholder="(555) 555-5555" className={inputCls()} />
             </div>
-            <div className="sm:col-span-2">
+            <div>
               <Label className="text-slate-400 text-sm mb-1.5 block">Program / Role</Label>
               <Select value={partnerType} onChange={setPartnerType} options={PARTNER_OPTIONS} />
+            </div>
+            <div>
+              <Label className="text-slate-400 text-sm mb-1.5 block">Agent Tier</Label>
+              <div className="relative">
+                <select value={newTier} onChange={(e) => setNewTier(e.target.value)} className="w-full h-11 rounded-xl border border-white/[0.1] bg-white/[0.04] text-white text-sm px-4 pr-8 appearance-none focus:outline-none focus:border-blue-500/50">
+                  <option value="" className="bg-[#111827]">Not set</option>
+                  <option value="1" className="bg-[#111827]">Tier 1 — Direct Provider Access</option>
+                  <option value="2" className="bg-[#111827]">Tier 2 — Website Submission</option>
+                </select>
+                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-500 pointer-events-none" />
+              </div>
+            </div>
+            <div className="sm:col-span-2">
+              <Label className="text-slate-400 text-sm mb-1.5 block">Approved States</Label>
+              <div className="max-h-28 overflow-y-auto rounded-xl border border-white/[0.1] bg-white/[0.04] p-2 grid grid-cols-6 sm:grid-cols-10 gap-1">
+                {US_STATES.map((s) => {
+                  const checked = newStates.includes(s)
+                  return (
+                    <label key={s} className={`flex items-center gap-1 text-xs cursor-pointer rounded px-1.5 py-0.5 ${checked ? "bg-blue-500/20 text-white font-semibold" : "text-slate-500 hover:bg-white/[0.04]"}`}>
+                      <input type="checkbox" checked={checked} onChange={() => setNewStates((prev) => checked ? prev.filter((x) => x !== s) : [...prev, s])} className="h-3 w-3 rounded border-white/20 bg-white/[0.05] accent-blue-500" />
+                      {s}
+                    </label>
+                  )
+                })}
+              </div>
+              <p className="text-[10px] text-slate-600 mt-1">{newStates.length} state{newStates.length !== 1 ? "s" : ""} selected</p>
+            </div>
+            <div className="sm:col-span-2 flex items-center gap-6">
+              <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={newActive} onChange={(e) => setNewActive(e.target.checked)} className="h-4 w-4 rounded border-white/20 bg-white/[0.05] accent-emerald-500" /><span className="text-xs text-slate-300">Active</span></label>
+              <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={newDirectAccess} onChange={(e) => setNewDirectAccess(e.target.checked)} className="h-4 w-4 rounded border-white/20 bg-white/[0.05] accent-emerald-500" /><span className="text-xs text-slate-300">Direct Provider Access</span></label>
+              <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={newCanReceive} onChange={(e) => setNewCanReceive(e.target.checked)} className="h-4 w-4 rounded border-white/20 bg-white/[0.05] accent-emerald-500" /><span className="text-xs text-slate-300">Can Receive Leads</span></label>
             </div>
           </div>
           {errors.submit && <p className="text-red-400 text-sm mb-3">{errors.submit}</p>}

@@ -1,83 +1,68 @@
 # Stance Marketing — Lead Pool System PRD
 
 ## Original Problem Statement
-Build a production-ready Lead Pool system for admin-controlled lead assignment, agent eligibility, and secure lead claiming. Admin adds leads manually, assigns eligible Tier 1 agents by state, notifies agents by email, and allows exactly one agent to claim each lead. Sensitive lead details hidden until claimed.
+Build a production-ready Lead Pool system for admin-controlled lead assignment, agent eligibility, and secure lead claiming. Two tiers: Tier 1 (direct provider access, can claim leads) and Tier 2 (website submission, orders become leads for Tier 1).
 
 ## Architecture
 - **Framework**: Next.js 14 (App Router) with TypeScript
 - **Storage**: Vercel Blob (@vercel/blob) for all data
 - **Email**: Google Apps Script (GOOGLE_LEADS_SCRIPT_URL)
 - **Auth**: Password-based cookie auth (ADMIN_PASSWORD)
-- **Deployment**: Vercel (production) / Emergent (preview)
 
-## User Personas
-1. **Admin** — Creates leads, manages agents, monitors claim activity
-2. **Tier 1 Agents** — Direct provider access, can claim leads from the pool
-3. **Tier 2 Agents** — Website submission agents, cannot claim leads
+## Complete Pipeline Map
 
-## Core Requirements (Static)
-- Leads tab is farthest left in admin panel
-- Provider field is write-in (not dropdown)
-- DOB field is write-in with auto-formatting (not calendar picker)
-- Provider appears before Product Selected
-- State-specific Tier 1 agent eligibility
-- Secure claim tokens (UUID-based, 7-day expiry)
-- Sensitive data hidden until lead is claimed
-- Duplicate claim prevention (token locking, status checks)
-- Admin notification to gamblerspassion@gmail.com on claim
+### Pipeline 1: Onboarding → Agent
+Admin creates onboarding link → Agent completes onboarding → POST /api/onboard → Agent profile created (source: "onboarding") → Admin sets tier/states in Agents tab
+
+### Pipeline 2: Manual Agent Creation
+Admin → Agents tab → Add Agent (with tier, states, toggles) → POST /api/agents → Ready for leads
+
+### Pipeline 3: Manual Lead Creation
+Admin → Leads tab → Add Lead → POST /api/leads → Select eligible Tier 1 agents → Send notifications → Agent clicks claim link → Claims lead
+
+### Pipeline 4: Tier 2 Orders → Auto-Create Leads
+Tier 2 agent submits order → POST /api/submit-order → Order saved → Agent tier checked → If Tier 2: auto-creates unclaimed Lead → Shows in Leads tab for admin to notify Tier 1 agents
+
+### Pipeline 5: Lead Claim Flow
+Agent receives email → Clicks claim link → /claim/{token} → Preview (state/provider/product) → Clicks Claim → Lead locked → Full details revealed → Admin notified
 
 ## What's Been Implemented (May 17, 2026)
 
-### Backend (Next.js API Routes)
-- `GET/POST /api/leads` — List and create leads
-- `GET/PATCH/DELETE /api/leads/[id]` — Individual lead CRUD
-- `POST /api/leads/[id]/notify` — Send claim emails to selected agents
-- `GET/POST /api/leads/claim/[token]` — Verify and execute claims
-- `GET /api/leads/activity` — Activity log
-- `PATCH /api/agents/[id]` — Extended with tier, approvedStates, activeStatus, directProviderAccess, canReceiveLeads
+### Backend
+- Leads CRUD: GET/POST /api/leads, GET/PATCH/DELETE /api/leads/[id]
+- Lead notification: POST /api/leads/[id]/notify
+- Lead claiming: GET/POST /api/leads/claim/[token]
+- Activity log: GET /api/leads/activity
+- Agent CRUD with tier/states: POST/GET /api/agents, PATCH/DELETE /api/agents/[id]
+- **Tier 2 auto-lead creation** in POST /api/submit-order
+- Agent creation with tier/states included from the start
 
 ### Frontend
-- **Leads Panel** (`/components/admin/leads-panel.tsx`) — Full lead management UI with add form, status filters, agent notification modal, activity log
-- **Agents Panel** (`/components/admin/agents-panel.tsx`) — Updated with Lead Pool Settings (tier, approved states, toggles)
-- **Admin Tabs** (`/components/admin/link-generator.tsx`) — Leads tab added as first tab
-- **Claim Page** (`/app/claim/[token]/page.tsx`) — Public claim page with preview, claim, and error states
+- **Leads Panel**: Add lead form, search, status filters, pagination, bulk select/delete/status-change, notify agents modal, activity log
+- **Agents Panel**: Add agent form WITH tier/states/toggles, search, pagination, bulk select/delete, inline edit with Lead Pool Settings
+- **Orders Panel**: Search, status filters, pagination, prominent delete on every row, bulk select/delete/status-change, inline edit
+- **Claim Page**: Preview, claim, success with full details, error states
+- **Tab order**: Onboarding Links → Agents → Orders → Leads (far right, not default)
 
-### Data Types (`/lib/order-types.ts`)
-- `Lead`, `LeadClaimToken`, `LeadActivityLog`, `AgentTier`, `LeadStatus`
-- Extended `AgentProfile` with tier, approvedStates, activeStatus, directProviderAccess, canReceiveLeads
-
-### Google Apps Script (`/appscript-leads.txt`)
-- Complete Apps Script for lead notifications, claim emails, admin notifications
-- LockService for race condition prevention
-- Leads sheet management (farthest left)
-- Lead Activity Log sheet
-- Agents sheet, Lead Claim Tokens sheet
+### Google Apps Script (appscript-leads.txt)
+- Complete: lead notifications, claim emails, admin notifications, LockService, sheet management
 
 ## Prioritized Backlog
 
-### P0 (Critical)
-- [x] Lead creation with all fields
-- [x] Agent tier/state classification
-- [x] State-specific agent filtering
-- [x] Secure claim token flow
-- [x] Duplicate claim prevention
-- [x] Admin lead status management
+### P0 (Done)
+- [x] All lead fields, state-specific eligibility, secure claims
+- [x] Tier 2 orders → auto-create leads
+- [x] Agent creation with tier/states from day one
+- [x] Pagination, search, bulk ops on all panels
+- [x] Prominent delete everywhere
 
-### P1 (Important)
+### P1 (Next)
 - [ ] Deploy Google Apps Script and set GOOGLE_LEADS_SCRIPT_URL
-- [ ] Configure NEXT_PUBLIC_BASE_URL for claim links in emails
-- [ ] Lead expiration cron job (auto-expire unclaimed leads after X days)
+- [ ] Set NEXT_PUBLIC_BASE_URL for claim link URLs
+- [ ] Classify existing 13 agents by tier/state
 
-### P2 (Nice to Have)
+### P2 (Backlog)
+- [ ] Lead expiration cron job
 - [ ] CSV export for leads
-- [ ] Bulk lead status updates
-- [ ] Agent self-service portal for viewing claimed leads
-- [ ] Real-time lead count dashboard
-- [ ] Lead analytics/reporting
-
-## Next Tasks
-1. Deploy the Google Apps Script from `/appscript-leads.txt` to Google Apps Script
-2. Set `GOOGLE_LEADS_SCRIPT_URL` environment variable in Vercel
-3. Set `NEXT_PUBLIC_BASE_URL` environment variable for claim link generation
-4. Test email notification flow end-to-end
-5. Consider adding lead expiration logic
+- [ ] Agent self-service portal
+- [ ] Lead analytics dashboard
