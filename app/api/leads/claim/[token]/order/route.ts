@@ -1,0 +1,99 @@
+import { NextRequest, NextResponse } from "next/server"
+import { put, list } from "@vercel/blob"
+import type { Lead, LeadClaimToken } from "@/lib/order-types"
+
+export const dynamic = "force-dynamic"
+
+async function loadToken(token: string): Promise<LeadClaimToken | null> {
+  const { blobs } = await list({ prefix: `leads/tokens/${token}.json` })
+  const match = blobs.find((b) => b.pathname === `leads/tokens/${token}.json`)
+  if (!match) return null
+  const res = await fetch(match.url, { cache: "no-store" })
+  if (!res.ok) return null
+  return res.json() as Promise<LeadClaimToken>
+}
+
+async function loadLead(id: string): Promise<Lead | null> {
+  const { blobs } = await list({ prefix: `leads/${id}.json` })
+  const match = blobs.find((b) => b.pathname === `leads/${id}.json`)
+  if (!match) return null
+  const res = await fetch(match.url, { cache: "no-store" })
+  if (!res.ok) return null
+  return res.json() as Promise<Lead>
+}
+
+async function logActivity(entry: { timestamp: string; leadId: string; action: string; actorName: string; actorEmail: string; details: string }) {
+  const id = crypto.randomUUID().replace(/-/g, "").slice(0, 16)
+  await put(`leads/activity/${id}.json`, JSON.stringify({ id, ...entry }), {
+    access: "public",
+    contentType: "application/json",
+    addRandomSuffix: false,
+    allowOverwrite: true,
+  })
+}
+
+// POST /api/leads/claim/[token]/order — agent submits the order number after processing the sale
+export async function POST(
+  req: NextRequest,
+  { params }: { params: { token: string } }
+) {
+  const { token } = params
+  try {
+    const body = await req.json()
+    const orderNumber = String(body.orderNumber || "").trim()
+    if (!orderNumber) {
+      return NextResponse.json({ success: false, message: "Order number is required." }, { status: 400 })
+    }
+
+    const claimToken = await loadToken(token)
+    if (!claimToken) {
+      return NextResponse.json({ success: false, message: "Invalid claim link." }, { status: 404 })
+    }
+
+    const lead = await loadLead(claimToken.leadId)
+    if (!lead) {
+      return NextResponse.json({ success: false, message: "Lead not found." }, { status: 404 })
+    }
+
+    // Only the agent who claimed this lead can submit its order number
+    if (lead.claimedByAgentId !== claimToken.agentId) {
+      return NextResponse.json({ success: false, message: "This lead is not assigned to you." }, { status: 403 })
+    }
+
+    const now = new Date().toISOString()
+    const previousOrder = lead.orderNumber
+    lead.orderNumber = orderNumber
+    if (!lead.orderSubmittedAt) lead.orderSubmittedAt = now
+    // Mark lead as completed once an order number is on file
+    if (lead.status === "claimed") lead.status = "completed"
+    lead.updatedAt = now
+
+    await put(`leads/${lead.id}.json`, JSON.stringify(lead), {
+      access: "public",
+      contentType: "application/json",
+      addRandomSuffix: false,
+      allowOverwrite: true,
+    })
+
+    await logActivity({
+      timestamp: now,
+      leadId: lead.id,
+      action: previousOrder ? "Order Number Updated" : "Order Number Submitted",
+      actorName: lead.claimedByAgentName || "Agent",
+      actorEmail: lead.claimedByAgentEmail || "",
+      details: previousOrder
+        ? `Order number changed from ${previousOrder} to ${orderNumber}`
+        : `Order number ${orderNumber} submitted; lead marked completed`,
+    })
+
+    return NextResponse.json({
+      success: true,
+      message: previousOrder ? "Order number updated." : "Order number saved. This lead is now complete.",
+      orderNumber: lead.orderNumber,
+      status: lead.status,
+    })
+  } catch (err) {
+    console.error("Order number submit error:", err)
+    return NextResponse.json({ success: false, message: "Failed to save order number." }, { status: 500 })
+  }
+}

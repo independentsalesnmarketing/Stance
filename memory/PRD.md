@@ -1,68 +1,34 @@
-# Stance Marketing — Lead Pool System PRD
+# Stance Marketing — Internal Ops App
 
-## Original Problem Statement
-Build a production-ready Lead Pool system for admin-controlled lead assignment, agent eligibility, and secure lead claiming. Two tiers: Tier 1 (direct provider access, can claim leads) and Tier 2 (website submission, orders become leads for Tier 1).
+## Problem Statement
+Existing Next.js (App Router) admin/agent platform managing:
+1. Onboarding link generation
+2. Agents directory (with tier, approved states, lead eligibility)
+3. Orders submission & history
+4. Leads pool — admin creates leads, notifies eligible Tier-1 agents by email; agents claim via unique tokenized links
+
+User asked to (a) add the Vercel Blob token, (b) add an "X" to collapse the expanded lead row in the admin panel, and (c) complete the leads tab — specifically, after an agent claims a lead they need a way to submit the carrier order number once the sale is processed, so admin can see what happens after the claim.
 
 ## Architecture
-- **Framework**: Next.js 14 (App Router) with TypeScript
-- **Storage**: Vercel Blob (@vercel/blob) for all data
-- **Email**: Google Apps Script (GOOGLE_LEADS_SCRIPT_URL)
-- **Auth**: Password-based cookie auth (ADMIN_PASSWORD)
+- Next.js 14.2.25 (App Router) under `/app`
+- Storage: Vercel Blob (`@vercel/blob`) — JSON blobs under `leads/`, `leads/tokens/`, `leads/activity/`, `agent-profiles/`, `orders/`
+- Email: Google Apps Script webhook (`GOOGLE_LEADS_SCRIPT_URL`) — sends agent claim emails and admin notifications
 
-## Complete Pipeline Map
+## Implemented (2026-01)
+- `BLOB_READ_WRITE_TOKEN` added to `/app/.env.local`
+- Lead model extended with `orderNumber` + `orderSubmittedAt`
+- `PATCH /api/leads/[id]` now accepts `orderNumber` (admin path) with activity log
+- New `POST /api/leads/claim/[token]/order` — token-authenticated endpoint so the claiming agent can submit/update an order number without admin access. Auto-flips status `claimed → completed`
+- `/claim/[token]` page: after successful claim (and on revisit of already-claimed lead), shows a clearly labelled "Submit Order Number" block with input + save; once saved displays it and offers Edit. Activity log entry created for every submit/update
+- Admin leads panel:
+  - **X collapse button** at the top of the expanded lead row (`collapse-lead-btn-{id}`)
+  - Claim status block now shows the order number (or "awaiting agent" when missing) plus a new "Completed" variant
+- Frontend (Next dev) running via supervisor at port 3000
 
-### Pipeline 1: Onboarding → Agent
-Admin creates onboarding link → Agent completes onboarding → POST /api/onboard → Agent profile created (source: "onboarding") → Admin sets tier/states in Agents tab
+## Known External Blocker
+The provided Vercel Blob token authenticates successfully, **but the Blob store itself is currently suspended** on Vercel (`BlobStoreSuspendedError: This store has been suspended`). All write paths fail until the store is unsuspended in the Vercel dashboard. Code is correct and ready.
 
-### Pipeline 2: Manual Agent Creation
-Admin → Agents tab → Add Agent (with tier, states, toggles) → POST /api/agents → Ready for leads
-
-### Pipeline 3: Manual Lead Creation
-Admin → Leads tab → Add Lead → POST /api/leads → Select eligible Tier 1 agents → Send notifications → Agent clicks claim link → Claims lead
-
-### Pipeline 4: Tier 2 Orders → Auto-Create Leads
-Tier 2 agent submits order → POST /api/submit-order → Order saved → Agent tier checked → If Tier 2: auto-creates unclaimed Lead → Shows in Leads tab for admin to notify Tier 1 agents
-
-### Pipeline 5: Lead Claim Flow
-Agent receives email → Clicks claim link → /claim/{token} → Preview (state/provider/product) → Clicks Claim → Lead locked → Full details revealed → Admin notified
-
-## What's Been Implemented (May 17, 2026)
-
-### Backend
-- Leads CRUD: GET/POST /api/leads, GET/PATCH/DELETE /api/leads/[id]
-- Lead notification: POST /api/leads/[id]/notify
-- Lead claiming: GET/POST /api/leads/claim/[token]
-- Activity log: GET /api/leads/activity
-- Agent CRUD with tier/states: POST/GET /api/agents, PATCH/DELETE /api/agents/[id]
-- **Tier 2 auto-lead creation** in POST /api/submit-order
-- Agent creation with tier/states included from the start
-
-### Frontend
-- **Leads Panel**: Add lead form, search, status filters, pagination, bulk select/delete/status-change, notify agents modal, activity log
-- **Agents Panel**: Add agent form WITH tier/states/toggles, search, pagination, bulk select/delete, inline edit with Lead Pool Settings
-- **Orders Panel**: Search, status filters, pagination, prominent delete on every row, bulk select/delete/status-change, inline edit
-- **Claim Page**: Preview, claim, success with full details, error states
-- **Tab order**: Onboarding Links → Agents → Orders → Leads (far right, not default)
-
-### Google Apps Script (appscript-leads.txt)
-- Complete: lead notifications, claim emails, admin notifications, LockService, sheet management
-
-## Prioritized Backlog
-
-### P0 (Done)
-- [x] All lead fields, state-specific eligibility, secure claims
-- [x] Tier 2 orders → auto-create leads
-- [x] Agent creation with tier/states from day one
-- [x] Pagination, search, bulk ops on all panels
-- [x] Prominent delete everywhere
-
-### P1 (Next)
-- [ ] Deploy Google Apps Script and set GOOGLE_LEADS_SCRIPT_URL
-- [ ] Set NEXT_PUBLIC_BASE_URL for claim link URLs
-- [ ] Classify existing 13 agents by tier/state
-
-### P2 (Backlog)
-- [ ] Lead expiration cron job
-- [ ] CSV export for leads
-- [ ] Agent self-service portal
-- [ ] Lead analytics dashboard
+## Backlog / Next
+- Unsuspend the Vercel Blob store, then verify end-to-end (create lead → notify → claim → submit order #)
+- Optional: notify admin via Apps Script when an agent submits an order number
+- Optional: surface "Order #" column in the admin leads table list (currently only in expanded view)

@@ -1,8 +1,9 @@
 "use client"
 
 import React, { useState, useEffect } from "react"
-import { Loader2, CheckCircle2, XCircle, MapPin, Building2, Package, Shield } from "lucide-react"
+import { Loader2, CheckCircle2, XCircle, MapPin, Building2, Package, Shield, Hash, Edit2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 
 interface PreviewInfo {
   state: string
@@ -23,6 +24,7 @@ interface LeadDetails {
   preferredInstallDate: string
   preferredInstallTime: string
   notes: string
+  orderNumber?: string
 }
 
 export default function ClaimPage({ params }: { params: { token: string } }) {
@@ -36,6 +38,11 @@ export default function ClaimPage({ params }: { params: { token: string } }) {
   const [claimed, setClaimed] = useState(false)
   const [leadDetails, setLeadDetails] = useState<LeadDetails | null>(null)
   const [alreadyClaimed, setAlreadyClaimed] = useState(false)
+  const [orderNumber, setOrderNumber] = useState("")
+  const [orderEditMode, setOrderEditMode] = useState(false)
+  const [orderSaving, setOrderSaving] = useState(false)
+  const [orderError, setOrderError] = useState("")
+  const [orderSuccess, setOrderSuccess] = useState("")
 
   useEffect(() => {
     const verify = async () => {
@@ -50,6 +57,7 @@ export default function ClaimPage({ params }: { params: { token: string } }) {
         } else if (data.alreadyClaimed && data.claimedBySelf && data.lead) {
           setAlreadyClaimed(true)
           setLeadDetails(data.lead)
+          if (data.lead.orderNumber) setOrderNumber(data.lead.orderNumber)
         }
       } catch {
         setMessage("Something went wrong. Please try again later.")
@@ -78,6 +86,104 @@ export default function ClaimPage({ params }: { params: { token: string } }) {
     } finally {
       setClaiming(false)
     }
+  }
+
+  const handleOrderSubmit = async () => {
+    const trimmed = orderNumber.trim()
+    if (!trimmed) {
+      setOrderError("Please enter the order number.")
+      return
+    }
+    setOrderSaving(true)
+    setOrderError("")
+    setOrderSuccess("")
+    try {
+      const res = await fetch(`/api/leads/claim/${token}/order`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderNumber: trimmed }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        setOrderSuccess(data.message || "Order number saved.")
+        setOrderEditMode(false)
+        setLeadDetails((prev) => (prev ? { ...prev, orderNumber: data.orderNumber } : prev))
+      } else {
+        setOrderError(data.message || "Failed to save order number.")
+      }
+    } catch {
+      setOrderError("Network error. Please try again.")
+    } finally {
+      setOrderSaving(false)
+    }
+  }
+
+  // Renders the order-number capture / display block (used in both claimed and alreadyClaimed views)
+  const renderOrderBlock = () => {
+    const hasOrder = !!leadDetails?.orderNumber && !orderEditMode
+    return (
+      <div className="mt-2 rounded-xl border border-blue-500/20 bg-blue-500/[0.06] p-4" data-testid="order-number-block">
+        <div className="flex items-center justify-between gap-2 mb-2">
+          <div className="flex items-center gap-2">
+            <Hash className="h-4 w-4 text-blue-300" />
+            <p className="text-xs font-bold text-blue-200 uppercase tracking-[0.15em]">
+              {hasOrder ? "Order Number on File" : "Submit Order Number"}
+            </p>
+          </div>
+          {hasOrder && (
+            <button
+              type="button"
+              onClick={() => { setOrderEditMode(true); setOrderSuccess(""); setOrderError("") }}
+              data-testid="order-number-edit-btn"
+              className="text-xs text-blue-300 hover:text-blue-200 inline-flex items-center gap-1"
+            >
+              <Edit2 className="h-3 w-3" /> Edit
+            </button>
+          )}
+        </div>
+
+        {hasOrder ? (
+          <p className="text-base text-white font-mono tracking-wider" data-testid="order-number-display">
+            {leadDetails?.orderNumber}
+          </p>
+        ) : (
+          <>
+            <p className="text-xs text-slate-400 leading-relaxed mb-3">
+              After you process this sale, paste the carrier order number here so admin can track the commission.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Input
+                value={orderNumber}
+                onChange={(e) => { setOrderNumber(e.target.value); if (orderError) setOrderError("") }}
+                placeholder="e.g. ABC123456789"
+                disabled={orderSaving}
+                data-testid="order-number-input"
+                className="bg-white/[0.04] border-white/[0.1] text-white placeholder:text-slate-500 h-11 rounded-xl font-mono"
+              />
+              <Button
+                onClick={handleOrderSubmit}
+                disabled={orderSaving || !orderNumber.trim()}
+                data-testid="order-number-submit-btn"
+                className="bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-xl h-11 px-5 text-sm whitespace-nowrap"
+              >
+                {orderSaving ? <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />Saving...</> : "Save Order #"}
+              </Button>
+            </div>
+            {orderEditMode && (
+              <button
+                type="button"
+                onClick={() => { setOrderEditMode(false); setOrderError(""); setOrderNumber(leadDetails?.orderNumber || "") }}
+                className="mt-2 text-xs text-slate-400 hover:text-slate-200"
+              >
+                Cancel
+              </button>
+            )}
+          </>
+        )}
+        {orderError && <p className="text-red-400 text-xs mt-2" data-testid="order-number-error">{orderError}</p>}
+        {orderSuccess && <p className="text-emerald-400 text-xs mt-2" data-testid="order-number-success">{orderSuccess}</p>}
+      </div>
+    )
   }
 
   // Loading state
@@ -125,6 +231,7 @@ export default function ClaimPage({ params }: { params: { token: string } }) {
                   <span className="text-sm text-white text-right" data-testid={`lead-detail-${r.label.toLowerCase().replace(/\s+/g, "-")}`}>{r.value}</span>
                 </div>
               ))}
+              {renderOrderBlock()}
             </div>
           </div>
         </div>
@@ -165,6 +272,7 @@ export default function ClaimPage({ params }: { params: { token: string } }) {
                   <span className="text-sm text-white text-right">{r.value}</span>
                 </div>
               ))}
+              {renderOrderBlock()}
             </div>
           </div>
         </div>

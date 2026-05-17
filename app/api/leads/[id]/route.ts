@@ -85,6 +85,21 @@ export async function PATCH(
     if (body.eligibleAgentIds !== undefined) lead.eligibleAgentIds = body.eligibleAgentIds
     if (body.notifiedAgentIds !== undefined) lead.notifiedAgentIds = body.notifiedAgentIds
 
+    // Order number tracking (set when agent processes the sale)
+    if (body.orderNumber !== undefined) {
+      const orderNum = String(body.orderNumber).trim()
+      lead.orderNumber = orderNum
+      if (orderNum && !lead.orderSubmittedAt) {
+        lead.orderSubmittedAt = now
+      }
+      if (!orderNum) {
+        lead.orderSubmittedAt = ""
+      }
+      actionLog = actionLog
+        ? `${actionLog}; order number set to ${orderNum || "(cleared)"}`
+        : `Order number ${orderNum ? "set to " + orderNum : "cleared"}`
+    }
+
     // Editable lead fields
     const editableFields = [
       "fullName", "address", "state", "email", "phone", "dob",

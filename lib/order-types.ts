@@ -90,6 +90,8 @@ export interface Lead {
   removedAt: string
   adminNotes: string
   updatedAt: string
+  orderNumber?: string
+  orderSubmittedAt?: string
 }
 
 export interface LeadClaimToken {

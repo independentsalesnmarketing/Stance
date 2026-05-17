@@ -507,6 +507,19 @@ export function LeadsPanel() {
                   {/* Expanded */}
                   {isOpen && (
                     <div className="border-t border-white/[0.07] px-4 pb-5 pt-4 space-y-5">
+                      <div className="flex items-center justify-between">
+                        <p className="text-[10px] text-slate-500 uppercase tracking-[0.2em] font-bold">Lead Detail</p>
+                        <Button
+                          variant="outline"
+                          onClick={() => setExpanded(null)}
+                          data-testid={`collapse-lead-btn-${lead.id}`}
+                          title="Collapse this lead"
+                          aria-label="Collapse this lead"
+                          className="border-white/[0.1] bg-white/[0.03] text-slate-400 hover:text-white hover:bg-white/[0.08] rounded-lg h-7 w-7 p-0"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
                       <div className="grid sm:grid-cols-2 gap-5">
                         <div className="space-y-3 text-sm">
                           <p className="text-[10px] text-slate-600 uppercase tracking-[0.15em] font-semibold">Lead Information</p>
@@ -535,6 +548,17 @@ export function LeadsPanel() {
                                 <p className="text-xs text-slate-400">By: <span className="text-white">{lead.claimedByAgentName}</span></p>
                                 <p className="text-xs text-slate-400">Email: <span className="text-white">{lead.claimedByAgentEmail}</span></p>
                                 {lead.claimedAt && <p className="text-xs text-slate-400">At: <span className="text-white">{new Date(lead.claimedAt).toLocaleString()}</span></p>}
+                                <p className="text-xs text-slate-400">Order #: <span className={`font-mono ${lead.orderNumber ? "text-emerald-300" : "text-amber-400"}`} data-testid={`admin-order-number-${lead.id}`}>{lead.orderNumber || "awaiting agent"}</span></p>
+                              </div>
+                            </div>
+                          ) : lead.status === "completed" ? (
+                            <div className="rounded-xl border border-violet-500/20 bg-violet-500/[0.04] p-3 space-y-2">
+                              <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-violet-400" /><span className="text-xs text-violet-300 font-semibold">Completed</span></div>
+                              <div className="space-y-1">
+                                <p className="text-xs text-slate-400">By: <span className="text-white">{lead.claimedByAgentName || "—"}</span></p>
+                                <p className="text-xs text-slate-400">Email: <span className="text-white">{lead.claimedByAgentEmail || "—"}</span></p>
+                                <p className="text-xs text-slate-400">Order #: <span className="text-violet-200 font-mono" data-testid={`admin-order-number-${lead.id}`}>{lead.orderNumber || "—"}</span></p>
+                                {lead.orderSubmittedAt && <p className="text-xs text-slate-400">Submitted: <span className="text-white">{new Date(lead.orderSubmittedAt).toLocaleString()}</span></p>}
                               </div>
                             </div>
                           ) : lead.status === "unclaimed" ? (

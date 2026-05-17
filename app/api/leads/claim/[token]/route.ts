@@ -77,6 +77,7 @@ export async function GET(
           preferredInstallDate: lead.preferredInstallDate,
           preferredInstallTime: lead.preferredInstallTime,
           notes: lead.notes,
+          orderNumber: lead.orderNumber || "",
         } : null,
       })
     }
