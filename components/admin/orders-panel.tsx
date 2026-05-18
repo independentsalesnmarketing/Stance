@@ -41,6 +41,7 @@ export function OrdersPanel() {
   const [loading, setLoading]         = useState(true)
   const [updating, setUpdating]       = useState<string | null>(null)
   const [filterStatus, setFilterStatus] = useState<OrderStatus | "all">("all")
+  const [timeTab, setTimeTab]         = useState<"all" | "today" | "week" | "month" | "older">("today")
   const [search, setSearch]           = useState("")
   const [expanded, setExpanded]       = useState<string | null>(null)
   const [adminNoteEdit, setAdminNoteEdit] = useState<Record<string, string>>({})
@@ -224,9 +225,51 @@ export function OrdersPanel() {
   }, [])
 
   // ── Filtering + pagination ─────────────────────────────────────────────────
+  // Time-bucket helper: which bucket does this order's submittedAt belong to?
+  const bucketFor = (iso: string): "today" | "week" | "month" | "older" => {
+    const t = new Date(iso).getTime()
+    if (isNaN(t)) return "older"
+    const ms = Date.now() - t
+    const day = 86_400_000
+    if (ms < day) return "today"
+    if (ms < 7 * day) return "week"
+    if (ms < 30 * day) return "month"
+    return "older"
+  }
+
   const filtered = useMemo(() => {
     const q = search.toLowerCase()
     return orders.filter((o) => {
+      if (filterStatus !== "all" && o.status !== filterStatus) return false
+      if (timeTab !== "all" && bucketFor(o.submittedAt) !== timeTab) return false
+      if (!q) return true
+      return (
+        o.agentName.toLowerCase().includes(q) ||
+        `${o.customerFirstName} ${o.customerLastName}`.toLowerCase().includes(q) ||
+        o.carrier.toLowerCase().includes(q) ||
+        o.service.toLowerCase().includes(q) ||
+        (o.orderNumber || "").toLowerCase().includes(q)
+      )
+    })
+  }, [orders, filterStatus, search, timeTab])
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const safePage = Math.min(page, totalPages)
+  const paged = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
+
+  useEffect(() => { setPage(1) }, [search, filterStatus, timeTab])
+
+  const counts = useMemo(() => {
+    const c: Record<string, number> = { all: orders.length }
+    for (const o of orders) c[o.status] = (c[o.status] || 0) + 1
+    return c
+  }, [orders])
+
+  // Live counts per timeline tab (respect the active status + search filters so the
+  // tab labels reflect what you'll actually see when you click)
+  const timeCounts = useMemo(() => {
+    const q = search.toLowerCase()
+    const pool = orders.filter((o) => {
       if (filterStatus !== "all" && o.status !== filterStatus) return false
       if (!q) return true
       return (
@@ -237,19 +280,10 @@ export function OrdersPanel() {
         (o.orderNumber || "").toLowerCase().includes(q)
       )
     })
+    const out = { all: pool.length, today: 0, week: 0, month: 0, older: 0 }
+    for (const o of pool) out[bucketFor(o.submittedAt)]++
+    return out
   }, [orders, filterStatus, search])
-
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
-  const safePage = Math.min(page, totalPages)
-  const paged = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
-
-  useEffect(() => { setPage(1) }, [search, filterStatus])
-
-  const counts = useMemo(() => {
-    const c: Record<string, number> = { all: orders.length }
-    for (const o of orders) c[o.status] = (c[o.status] || 0) + 1
-    return c
-  }, [orders])
 
   // ── Select all on current page ─────────────────────────────────────────────
   const allOnPageSelected = paged.length > 0 && paged.every((o) => selected.has(o.id))
@@ -305,6 +339,42 @@ export function OrdersPanel() {
           </Button>
         </div>
       )}
+
+      {/* Timeline tabs */}
+      <div className="flex items-center gap-1.5 flex-wrap border-b border-white/[0.06] pb-px">
+        {[
+          { key: "today",  label: "Today",       count: timeCounts.today,  accent: "blue" },
+          { key: "week",   label: "This Week",   count: timeCounts.week,   accent: "emerald" },
+          { key: "month",  label: "This Month",  count: timeCounts.month,  accent: "violet" },
+          { key: "older",  label: "Older",       count: timeCounts.older,  accent: "amber" },
+          { key: "all",    label: "All",         count: timeCounts.all,    accent: "slate" },
+        ].map((t) => {
+          const active = timeTab === t.key
+          const activeCls =
+            t.accent === "blue"     ? "border-blue-500 text-blue-300 bg-blue-500/[0.06]" :
+            t.accent === "emerald"  ? "border-emerald-500 text-emerald-300 bg-emerald-500/[0.06]" :
+            t.accent === "violet"   ? "border-violet-500 text-violet-300 bg-violet-500/[0.06]" :
+            t.accent === "amber"    ? "border-amber-500 text-amber-300 bg-amber-500/[0.06]" :
+                                      "border-slate-500 text-slate-200 bg-slate-500/[0.08]"
+          return (
+            <button
+              key={t.key}
+              onClick={() => setTimeTab(t.key as typeof timeTab)}
+              data-testid={`orders-time-tab-${t.key}`}
+              className={`relative flex items-center gap-2 px-4 h-10 text-sm font-semibold rounded-t-xl border-b-2 transition-colors ${
+                active ? activeCls : "border-transparent text-slate-500 hover:text-slate-200 hover:bg-white/[0.03]"
+              }`}
+            >
+              {t.label}
+              <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                active ? "bg-white/[0.1] text-white" : "bg-white/[0.04] text-slate-500"
+              }`}>
+                {t.count}
+              </span>
+            </button>
+          )
+        })}
+      </div>
 
       {/* Filters */}
       <div className="flex flex-wrap gap-3">
@@ -365,7 +435,29 @@ export function OrdersPanel() {
                     </div>
                     <div>
                       <p className="text-[10px] text-slate-600 uppercase tracking-[0.15em] font-semibold mb-0.5">Sale Date</p>
-                      <p className="text-sm text-slate-400">{fmt(order.saleDate)}</p>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-sm text-slate-400">{fmt(order.saleDate)}</p>
+                        {(() => {
+                          const t = new Date(order.submittedAt).getTime()
+                          if (isNaN(t)) return null
+                          const days = Math.floor((Date.now() - t) / 86_400_000)
+                          const label = days < 1 ? "today" : days === 1 ? "1d" : `${days}d`
+                          const tone =
+                            days <= 1 ? "bg-blue-500/15 text-blue-300 border-blue-500/25" :
+                            days <= 7 ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/25" :
+                            days <= 30 ? "bg-violet-500/15 text-violet-300 border-violet-500/25" :
+                                         "bg-amber-500/15 text-amber-300 border-amber-500/25"
+                          return (
+                            <span
+                              className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full border ${tone}`}
+                              title={`Submitted ${days} day${days === 1 ? "" : "s"} ago`}
+                              data-testid={`order-age-${order.id}`}
+                            >
+                              {label}
+                            </span>
+                          )
+                        })()}
+                      </div>
                     </div>
                   </button>
                   <div className="flex items-center gap-2 flex-shrink-0">
