@@ -89,7 +89,7 @@ export async function POST(
     })
 
     // Notify admin via Google Apps Script
-    const scriptUrl = "https://script.google.com/macros/s/AKfycbzMLyTEUsrjIjuDLLaYzv-5kgVkSwgUd7hPZiScfb5VRmKzDfkH6tYnorLDzPe_Vrjn/exec"
+    const scriptUrl = "https://script.google.com/macros/s/AKfycbzdTG41hZ2eiNpNE1eY9WIxxfu1pQDiL5wOEzD_LDblRfUCojKfqaU0PRK4dH8bi_E/exec"
     if (scriptUrl) {
       try {
         await fetch(scriptUrl, {

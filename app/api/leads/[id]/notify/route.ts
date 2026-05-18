@@ -102,7 +102,7 @@ export async function POST(
     })
 
     // Send emails via Google Apps Script
-    const scriptUrl = "https://script.google.com/macros/s/AKfycbzMLyTEUsrjIjuDLLaYzv-5kgVkSwgUd7hPZiScfb5VRmKzDfkH6tYnorLDzPe_Vrjn/exec"
+    const scriptUrl = "https://script.google.com/macros/s/AKfycbzdTG41hZ2eiNpNE1eY9WIxxfu1pQDiL5wOEzD_LDblRfUCojKfqaU0PRK4dH8bi_E/exec"
     if (scriptUrl) {
       const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || process.env.VERCEL_URL
         ? `https://${process.env.VERCEL_URL}`
