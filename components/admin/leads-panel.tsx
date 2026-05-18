@@ -101,9 +101,14 @@ export function LeadsPanel() {
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
-      const [leadsRes, agentsRes] = await Promise.all([fetch("/api/leads"), fetch("/api/agents")])
+      const [leadsRes, agentsRes, activityRes] = await Promise.all([
+        fetch("/api/leads"),
+        fetch("/api/agents"),
+        fetch("/api/leads/activity"),
+      ])
       if (leadsRes.ok) setLeads(await leadsRes.json())
       if (agentsRes.ok) setAgents(await agentsRes.json())
+      if (activityRes.ok) setActivityLogs(await activityRes.json())
     } finally {
       setLoading(false)
     }
@@ -119,6 +124,24 @@ export function LeadsPanel() {
     } finally {
       setActivityLoading(false)
     }
+  }
+
+  // Activity events in the last 24h (used to badge the Activity button)
+  const recentActivityCount = activityLogs.filter(l => {
+    const ts = new Date(l.timestamp).getTime()
+    return !isNaN(ts) && (Date.now() - ts) < 24 * 60 * 60 * 1000
+  }).length
+
+  // Activity icon + accent color per action type
+  const activityStyle = (action: string): { dot: string; ring: string } => {
+    const a = action.toLowerCase()
+    if (a.includes("created")) return { dot: "bg-slate-400", ring: "border-slate-500/30" }
+    if (a.includes("notif"))    return { dot: "bg-blue-400",  ring: "border-blue-500/30" }
+    if (a.includes("claim"))    return { dot: "bg-emerald-400", ring: "border-emerald-500/30" }
+    if (a.includes("order"))    return { dot: "bg-violet-400", ring: "border-violet-500/30" }
+    if (a.includes("removed") || a.includes("deleted")) return { dot: "bg-red-400", ring: "border-red-500/30" }
+    if (a.includes("status"))   return { dot: "bg-amber-400", ring: "border-amber-500/30" }
+    return { dot: "bg-slate-500", ring: "border-slate-500/30" }
   }
 
   const getEligibleAgents = useCallback((state: string): AgentProfile[] => {
@@ -334,8 +357,22 @@ export function LeadsPanel() {
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={() => { setShowActivity(true); loadActivity() }} data-testid="view-activity-btn" className="border-white/[0.1] bg-white/[0.03] text-slate-400 hover:text-white hover:bg-white/[0.06] rounded-xl h-9 px-3 text-xs">
-              <Activity className="h-3.5 w-3.5 mr-1.5" />Activity
+            <Button
+              onClick={() => { setShowActivity(true); loadActivity() }}
+              data-testid="view-activity-btn"
+              className="relative bg-blue-500/[0.08] border border-blue-500/30 text-blue-200 hover:bg-blue-500/[0.16] hover:text-white rounded-xl h-9 px-3.5 text-xs font-semibold shadow-lg shadow-blue-500/10"
+            >
+              <Activity className="h-3.5 w-3.5 mr-1.5" />
+              Activity
+              {recentActivityCount > 0 && (
+                <span
+                  className="ml-2 inline-flex items-center justify-center min-w-[20px] h-[18px] px-1.5 rounded-full bg-blue-500 text-white text-[10px] font-bold tracking-wider"
+                  data-testid="activity-badge-24h"
+                  title={`${recentActivityCount} event${recentActivityCount === 1 ? "" : "s"} in the last 24h`}
+                >
+                  {recentActivityCount > 99 ? "99+" : recentActivityCount}
+                </span>
+              )}
             </Button>
             <Button variant="outline" onClick={loadData} disabled={loading} data-testid="refresh-leads-btn" className="border-white/[0.1] bg-white/[0.03] text-slate-400 hover:text-white hover:bg-white/[0.06] rounded-xl h-9 px-3">
               <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
@@ -586,6 +623,45 @@ export function LeadsPanel() {
                           </div>
                         </div>
                       </div>
+                      {/* Per-lead activity timeline */}
+                      {(() => {
+                        const leadLogs = activityLogs.filter(l => l.leadId === lead.id)
+                        if (leadLogs.length === 0) return null
+                        return (
+                          <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4" data-testid={`lead-timeline-${lead.id}`}>
+                            <div className="flex items-center justify-between mb-3">
+                              <div className="flex items-center gap-2">
+                                <Activity className="h-3.5 w-3.5 text-slate-400" />
+                                <p className="text-[10px] text-slate-500 uppercase tracking-[0.2em] font-bold">Timeline</p>
+                                <span className="text-[10px] text-slate-600">· {leadLogs.length} event{leadLogs.length === 1 ? "" : "s"}</span>
+                              </div>
+                            </div>
+                            <div className="relative pl-1">
+                              <div className="absolute left-[7px] top-1 bottom-1 w-px bg-white/[0.06]" />
+                              <div className="space-y-3">
+                                {leadLogs.slice(0, 25).map((log) => {
+                                  const style = activityStyle(log.action)
+                                  return (
+                                    <div key={log.id} className="relative flex gap-3" data-testid={`timeline-event-${log.id}`}>
+                                      <div className={`relative z-10 flex-shrink-0 h-[15px] w-[15px] rounded-full bg-[#0d1117] border ${style.ring} flex items-center justify-center`}>
+                                        <div className={`h-1.5 w-1.5 rounded-full ${style.dot}`} />
+                                      </div>
+                                      <div className="min-w-0 flex-1 -mt-0.5">
+                                        <div className="flex items-baseline gap-2 flex-wrap">
+                                          <p className="text-xs font-semibold text-white">{log.action}</p>
+                                          <p className="text-[10px] text-slate-600">{new Date(log.timestamp).toLocaleString()}</p>
+                                        </div>
+                                        {log.details && <p className="text-[11px] text-slate-400 mt-0.5 leading-relaxed">{log.details}</p>}
+                                        {log.actorName && <p className="text-[10px] text-slate-600 mt-0.5">by {log.actorName}{log.actorEmail ? ` · ${log.actorEmail}` : ""}</p>}
+                                      </div>
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      })()}
                       <div className="flex items-center gap-2 flex-wrap pt-2 border-t border-white/[0.06]">
                         {lead.status === "unclaimed" && (
                           <>
