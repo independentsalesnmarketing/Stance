@@ -1,43 +1,45 @@
-# Stance Marketing — Internal Ops App
+# Stance Marketing - PRD
 
-## Problem Statement
-Existing Next.js (App Router) admin/agent platform managing:
-1. Onboarding link generation
-2. Agents directory (with tier, approved states, lead eligibility)
-3. Orders submission & history
-4. Leads pool — admin creates leads, notifies eligible Tier-1 agents by email; agents claim via unique tokenized links
-
-User asked to (a) add the Vercel Blob token, (b) add an "X" to collapse the expanded lead row in the admin panel, and (c) complete the leads tab — specifically, after an agent claims a lead they need a way to submit the carrier order number once the sale is processed, so admin can see what happens after the claim.
+## Original Problem Statement
+Review existing Stance Marketing Next.js repo. Three changes requested:
+1. Add Direct Deposit step after W-9 in onboarding flow
+2. After application completion, show expedite message with mailto link to Justin Johnson (justin.j@stance-marketing.com)
+3. AppScripts (onboarding + apply) need to send email notifications to gamblerspassion@gmail.com
 
 ## Architecture
-- Next.js 14.2.25 (App Router) under `/app`
-- Storage: Vercel Blob (`@vercel/blob`) — JSON blobs under `leads/`, `leads/tokens/`, `leads/activity/`, `agent-profiles/`, `orders/`
-- Email: Google Apps Script webhook (`GOOGLE_LEADS_SCRIPT_URL`) — sends agent claim emails and admin notifications
+- **Framework**: Next.js 14.2 (App Router)
+- **Hosting**: Vercel (production), Emergent preview environment
+- **Storage**: Vercel Blob (contracts, agent profiles, onboarding links)
+- **Sheets**: Google Apps Script (onboarding, applications, orders, leads)
+- **Email**: Resend API (admin + contractor notifications)
+- **Key pages**: `/apply`, `/onboarding`, `/orders`, `/admin`, `/claim`
 
-## Implemented (2026-01)
-- `BLOB_READ_WRITE_TOKEN` added to `/app/.env.local`
-- Lead model extended with `orderNumber` + `orderSubmittedAt`
-- `PATCH /api/leads/[id]` now accepts `orderNumber` (admin path) with activity log
-- New `POST /api/leads/claim/[token]/order` — token-authenticated endpoint so the claiming agent can submit/update an order number without admin access. Auto-flips status `claimed → completed`
-- `/claim/[token]` page: after successful claim (and on revisit of already-claimed lead), shows a clearly labelled "Submit Order Number" block with input + save; once saved displays it and offers Edit. Activity log entry created for every submit/update
-- Admin leads panel:
-  - **X collapse button** at the top of the expanded lead row (`collapse-lead-btn-{id}`)
-  - Claim status block now shows the order number (or "awaiting agent" when missing) plus a new "Completed" variant
-- Frontend (Next dev) running via supervisor at port 3000
+## User Personas
+- **Applicants**: People applying to join Stance as partners/agents
+- **Onboarding contractors**: Approved applicants completing their contractor setup
+- **Admin**: Stance team managing applications, agents, orders, leads
 
-## Known External Blocker
-The provided Vercel Blob token authenticates successfully, **but the Blob store itself is currently suspended** on Vercel (`BlobStoreSuspendedError: This store has been suspended`). All write paths fail until the store is unsuspended in the Vercel dashboard. Code is correct and ready.
+## Core Requirements
+- Multi-program application flow (referral, sales-agent, business, spectrum-event, tmobile-d2d, verizon-d2d)
+- 8-step onboarding: Details, Agreement, Signature, W-9, Direct Deposit, ID Upload, Badge Photo, Review
+- Google Sheets integration for all form data
+- Email notifications via Resend API and Google Apps Script MailApp
+- PDF generation for signed contracts
 
-## Backlog / Next
-- Unsuspend the Vercel Blob store, then verify end-to-end (create lead → notify → claim → submit order #)
-- Optional: notify admin via Apps Script when an agent submits an order number
-- Optional: surface "Order #" column in the admin leads table list (currently only in expanded view)
+## What's Been Implemented (Jan 18, 2026)
+1. **Direct Deposit Step (Onboarding)**: Added step 5 with bank name, routing number (9 digits), account number, account type (checking/savings). All fields validated. Shown in Review step with masked data. Included in completion summary cards.
+2. **Expedite Application Message**: Apply completion screen now shows "Want to expedite the application process?" with clickable mailto link to Director of Sales Justin Johnson (justin.j@stance-marketing.com).
+3. **AppScript Email Notifications**: 
+   - `appscript.txt`: `appendOnboarding` now includes direct deposit columns + calls `sendOnboardingEmail` to gamblerspassion@gmail.com
+   - `appscript-apply.txt`: `appendApplication` now calls `sendApplicationEmail` to gamblerspassion@gmail.com
+4. **API Route Update**: `/api/onboard` extracts and passes direct deposit fields to Google Sheet + includes in admin email
 
-## Iteration 2 (2026-01) — Blob unsuspended + optional wins
-- Verified end-to-end via curl: create lead → notify agent (Angelina, IL) → claim via token → submit order # → status flips to completed, order # persists, admin notification + activity log fire
-- Added **`Order #` column** to the Leads list (admin), shows `—` when missing, violet font when present (`lead-list-order-{id}` testid). Grid bumped from 5 → 6 columns
-- Added **admin email notification** when an agent submits an order number. New formType `leadOrderSubmitted` in `/app/appscript-leads.txt` with:
-  - `sendLeadOrderSubmittedAdminEmail()` — branded HTML email summarizing lead + agent + order # (handles both new submit and update)
-  - `updateLeadOrderNumber()` — sheet update that flips Status to "Completed" and appends the order # to admin notes column
-  - User must redeploy the Apps Script for the email to fire (no code change required in app)
-- **CDN cache hardening**: added `cacheControlMaxAge: 0` to all 22 `put()` calls and `?t=${Date.now()}` cache-buster to all blob `fetch()` reads across leads / orders / agents / onboarding. Fixes stale reads after writes — applies project-wide, not just leads
+## Prioritized Backlog
+- P0: None - all requested features implemented
+- P1: Deploy updated Google Apps Scripts to production (appscript.txt, appscript-apply.txt must be manually updated in Google Apps Script console)
+- P2: Add direct deposit info to contractor confirmation email
+- P2: Add direct deposit details to onboarding PDF generation
+
+## Next Tasks
+1. User must update Google Apps Scripts in their Google Script console with the new code from `appscript.txt` and `appscript-apply.txt`
+2. Consider adding account number confirmation field (re-enter account number) for additional validation
