@@ -58,15 +58,15 @@ export async function GET(
 
     if (claimToken.status === "used") {
       const lead = await loadLead(claimToken.leadId)
-      const isSameAgent = lead?.claimedByAgentId === claimToken.agentId
+      // Token was used by THIS agent (each agent gets a unique token per lead),
+      // so they're always the rightful claimer. Trust the token over the lead doc
+      // to avoid CDN propagation races where lead.claimedByAgentId is briefly stale.
       return NextResponse.json({
         valid: false,
         alreadyClaimed: true,
-        claimedBySelf: isSameAgent,
-        message: isSameAgent
-          ? "You have already claimed this lead. Your claim was successful."
-          : "This lead has already been claimed by another agent.",
-        lead: isSameAgent && lead ? {
+        claimedBySelf: true,
+        message: "You have already claimed this lead. Add the order number below once the sale is processed.",
+        lead: lead ? {
           fullName: lead.fullName,
           address: lead.address,
           state: lead.state,

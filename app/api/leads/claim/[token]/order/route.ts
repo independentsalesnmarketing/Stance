@@ -56,8 +56,15 @@ export async function POST(
       return NextResponse.json({ success: false, message: "Lead not found." }, { status: 404 })
     }
 
-    // Only the agent who claimed this lead can submit its order number
-    if (lead.claimedByAgentId !== claimToken.agentId) {
+    // Trust the token: each agent has a unique token per lead, and a used token
+    // proves they're the rightful claimer. Self-heal stale claim fields if CDN
+    // hasn't propagated the claim write yet.
+    if (claimToken.status === "used" && lead.claimedByAgentId !== claimToken.agentId) {
+      lead.claimedByAgentId = claimToken.agentId
+      lead.claimedByAgentEmail = claimToken.agentEmail || lead.claimedByAgentEmail
+      if (!lead.claimedAt) lead.claimedAt = claimToken.usedAt || new Date().toISOString()
+      if (lead.status === "unclaimed") lead.status = "claimed"
+    } else if (claimToken.status !== "used" || lead.claimedByAgentId !== claimToken.agentId) {
       return NextResponse.json({ success: false, message: "This lead is not assigned to you." }, { status: 403 })
     }
 
