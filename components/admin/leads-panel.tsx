@@ -82,6 +82,7 @@ export function LeadsPanel() {
   const [activityLoading, setActivityLoading] = useState(false)
   const [activitySearch, setActivitySearch] = useState("")
   const [activityFilter, setActivityFilter] = useState<"all" | "notify" | "claim" | "order" | "removed">("all")
+  const [activityAgent, setActivityAgent]   = useState<string>("all") // agent id, or "all", or "admin"
 
   // Agent selection for notification
   const [selectedAgents, setSelectedAgents] = useState<Set<string>>(new Set())
@@ -637,31 +638,31 @@ export function LeadsPanel() {
                         const leadLogs = activityLogs.filter(l => l.leadId === lead.id)
                         if (leadLogs.length === 0) return null
                         return (
-                          <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4" data-testid={`lead-timeline-${lead.id}`}>
-                            <div className="flex items-center justify-between mb-3">
-                              <div className="flex items-center gap-2">
-                                <Activity className="h-3.5 w-3.5 text-slate-400" />
-                                <p className="text-[10px] text-slate-500 uppercase tracking-[0.2em] font-bold">Timeline</p>
-                                <span className="text-[10px] text-slate-600">· {leadLogs.length} event{leadLogs.length === 1 ? "" : "s"}</span>
+                          <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5" data-testid={`lead-timeline-${lead.id}`}>
+                            <div className="flex items-center justify-between mb-4">
+                              <div className="flex items-center gap-2.5">
+                                <Activity className="h-4 w-4 text-slate-300" />
+                                <p className="text-xs text-slate-300 uppercase tracking-[0.2em] font-bold">Timeline</p>
+                                <span className="text-xs text-slate-500 font-medium">· {leadLogs.length} event{leadLogs.length === 1 ? "" : "s"}</span>
                               </div>
                             </div>
                             <div className="relative pl-1">
-                              <div className="absolute left-[7px] top-1 bottom-1 w-px bg-white/[0.06]" />
-                              <div className="space-y-3">
+                              <div className="absolute left-[11px] top-2 bottom-2 w-px bg-white/[0.08]" />
+                              <div className="space-y-4">
                                 {leadLogs.slice(0, 25).map((log) => {
                                   const style = activityStyle(log.action)
                                   return (
-                                    <div key={log.id} className="relative flex gap-3" data-testid={`timeline-event-${log.id}`}>
-                                      <div className={`relative z-10 flex-shrink-0 h-[15px] w-[15px] rounded-full bg-[#0d1117] border ${style.ring} flex items-center justify-center`}>
-                                        <div className={`h-1.5 w-1.5 rounded-full ${style.dot}`} />
+                                    <div key={log.id} className="relative flex gap-3.5" data-testid={`timeline-event-${log.id}`}>
+                                      <div className={`relative z-10 flex-shrink-0 h-[22px] w-[22px] rounded-full bg-[#0d1117] border ${style.ring} flex items-center justify-center`}>
+                                        <div className={`h-2.5 w-2.5 rounded-full ${style.dot}`} />
                                       </div>
-                                      <div className="min-w-0 flex-1 -mt-0.5">
+                                      <div className="min-w-0 flex-1">
                                         <div className="flex items-baseline gap-2 flex-wrap">
-                                          <p className="text-xs font-semibold text-white">{log.action}</p>
-                                          <p className="text-[10px] text-slate-600">{new Date(log.timestamp).toLocaleString()}</p>
+                                          <p className="text-sm font-bold text-white">{log.action}</p>
+                                          <p className="text-xs text-slate-500">{new Date(log.timestamp).toLocaleString()}</p>
                                         </div>
-                                        {log.details && <p className="text-[11px] text-slate-400 mt-0.5 leading-relaxed">{log.details}</p>}
-                                        {log.actorName && <p className="text-[10px] text-slate-600 mt-0.5">by {log.actorName}{log.actorEmail ? ` · ${log.actorEmail}` : ""}</p>}
+                                        {log.details && <p className="text-sm text-slate-300 mt-1 leading-relaxed">{log.details}</p>}
+                                        {log.actorName && <p className="text-xs text-slate-500 mt-1">by <span className="text-slate-400 font-medium">{log.actorName}</span>{log.actorEmail ? ` · ${log.actorEmail}` : ""}</p>}
                                       </div>
                                     </div>
                                   )
@@ -767,8 +768,32 @@ export function LeadsPanel() {
 
         const q = activitySearch.trim().toLowerCase()
         const filter = filterTypes.find(f => f.key === activityFilter)!
+
+        // Tier 1 agents are the only ones who appear in lead activity. Build a
+        // picker list of Tier 1 agents that actually have activity attributed to them.
+        const tier1Agents = agents.filter(a => a.tier === 1)
+        const agentMatches = (log: LeadActivityLog) => {
+          if (activityAgent === "all") return true
+          if (activityAgent === "admin") {
+            const n = (log.actorName || "").toLowerCase()
+            return n === "admin" || n === ""
+          }
+          const a = tier1Agents.find(x => x.id === activityAgent)
+          if (!a) return false
+          const targetEmail = (a.email || "").toLowerCase()
+          const targetName  = `${a.firstName} ${a.lastName}`.trim().toLowerCase()
+          const logEmail = (log.actorEmail || "").toLowerCase()
+          const logName  = (log.actorName  || "").toLowerCase()
+          // Match by either actor email OR actor name OR (for notify events) the details string mentions them
+          if (targetEmail && logEmail === targetEmail) return true
+          if (targetName  && logName  === targetName)  return true
+          if (targetName  && (log.details || "").toLowerCase().includes(targetName)) return true
+          return false
+        }
+
         const filtered = activityLogs.filter(l => {
           if (!filter.match(l.action)) return false
+          if (!agentMatches(l)) return false
           if (!q) return true
           const leadName = leadNameMap.get(l.leadId) || ""
           return (
@@ -848,6 +873,52 @@ export function LeadsPanel() {
                     data-testid="activity-search-input"
                     className="bg-white/[0.04] border-white/[0.08] text-white placeholder:text-slate-500 h-10 pl-10 pr-3 rounded-xl text-sm"
                   />
+                </div>
+
+                {/* Agent picker — leads are Tier 1 only, so this lists Tier 1 agents */}
+                <div className="flex items-center gap-2 mb-3">
+                  <Label className="text-xs text-slate-400 font-semibold whitespace-nowrap">Filter by agent:</Label>
+                  <div className="relative flex-1">
+                    <select
+                      value={activityAgent}
+                      onChange={(e) => setActivityAgent(e.target.value)}
+                      data-testid="activity-agent-filter"
+                      className="w-full h-9 rounded-xl border border-white/[0.08] bg-white/[0.04] text-white text-sm px-3 pr-8 appearance-none focus:outline-none focus:border-blue-500/50"
+                    >
+                      <option value="all" className="bg-[#111827]">All agents ({activityLogs.length})</option>
+                      <option value="admin" className="bg-[#111827]">Admin only</option>
+                      <optgroup label="Tier 1 Agents" className="bg-[#111827]">
+                        {tier1Agents
+                          .map(a => {
+                            const cnt = activityLogs.filter(l => {
+                              const e = (a.email || "").toLowerCase()
+                              const n = `${a.firstName} ${a.lastName}`.trim().toLowerCase()
+                              return (l.actorEmail || "").toLowerCase() === e
+                                || (l.actorName  || "").toLowerCase() === n
+                                || (n && (l.details || "").toLowerCase().includes(n))
+                            }).length
+                            return { agent: a, count: cnt }
+                          })
+                          .sort((x, y) => y.count - x.count)
+                          .map(({ agent: a, count: cnt }) => (
+                            <option key={a.id} value={a.id} className="bg-[#111827]">
+                              {a.firstName} {a.lastName} ({cnt})
+                            </option>
+                          ))}
+                      </optgroup>
+                    </select>
+                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-500 pointer-events-none" />
+                  </div>
+                  {activityAgent !== "all" && (
+                    <button
+                      onClick={() => setActivityAgent("all")}
+                      data-testid="activity-agent-clear"
+                      className="text-xs text-slate-400 hover:text-white px-2 h-9 rounded-lg hover:bg-white/[0.06] font-semibold"
+                      title="Clear agent filter"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  )}
                 </div>
 
                 {/* Filter chips */}
