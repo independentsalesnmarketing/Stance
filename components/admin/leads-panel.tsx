@@ -821,37 +821,37 @@ export function LeadsPanel() {
               <div className="px-6 pt-5 pb-4 border-b border-white/[0.07]">
                 <div className="flex items-center justify-between mb-4">
                   <div>
-                    <h3 className="text-base font-bold text-white flex items-center gap-2">
-                      <Activity className="h-4 w-4 text-blue-400" />
+                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                      <Activity className="h-5 w-5 text-blue-400" />
                       Lead Activity Log
                     </h3>
-                    <p className="text-[11px] text-slate-500 mt-0.5">
-                      <span className="text-blue-300 font-semibold">{todayCount}</span> today
-                      <span className="text-slate-700 mx-1.5">·</span>
-                      <span className="text-white font-semibold">{weekCount}</span> this week
-                      <span className="text-slate-700 mx-1.5">·</span>
-                      <span className="text-slate-400">{activityLogs.length}</span> total
+                    <p className="text-sm text-slate-400 mt-1">
+                      <span className="text-blue-300 font-bold">{todayCount}</span> today
+                      <span className="text-slate-700 mx-2">·</span>
+                      <span className="text-white font-bold">{weekCount}</span> this week
+                      <span className="text-slate-700 mx-2">·</span>
+                      <span className="text-slate-300">{activityLogs.length}</span> total
                     </p>
                   </div>
-                  <button onClick={() => setShowActivity(false)} className="text-slate-500 hover:text-white p-1 rounded-lg hover:bg-white/[0.06]" data-testid="close-activity-modal">
-                    <X className="h-4 w-4" />
+                  <button onClick={() => setShowActivity(false)} className="text-slate-500 hover:text-white p-1.5 rounded-lg hover:bg-white/[0.06]" data-testid="close-activity-modal">
+                    <X className="h-5 w-5" />
                   </button>
                 </div>
 
                 {/* Search */}
                 <div className="relative mb-3">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-500 pointer-events-none" />
+                  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500 pointer-events-none" />
                   <Input
                     value={activitySearch}
                     onChange={(e) => setActivitySearch(e.target.value)}
                     placeholder="Search by lead, agent, or detail..."
                     data-testid="activity-search-input"
-                    className="bg-white/[0.04] border-white/[0.08] text-white placeholder:text-slate-500 h-9 pl-9 pr-3 rounded-xl text-sm"
+                    className="bg-white/[0.04] border-white/[0.08] text-white placeholder:text-slate-500 h-10 pl-10 pr-3 rounded-xl text-sm"
                   />
                 </div>
 
                 {/* Filter chips */}
-                <div className="flex items-center gap-1.5 flex-wrap">
+                <div className="flex items-center gap-2 flex-wrap">
                   {filterTypes.map(f => {
                     const cnt = f.key === "all" ? activityLogs.length : activityLogs.filter(l => f.match(l.action)).length
                     const active = activityFilter === f.key
@@ -860,14 +860,14 @@ export function LeadsPanel() {
                         key={f.key}
                         onClick={() => setActivityFilter(f.key)}
                         data-testid={`activity-filter-${f.key}`}
-                        className={`inline-flex items-center gap-1.5 px-3 h-7 rounded-full text-[11px] font-semibold transition-colors ${
+                        className={`inline-flex items-center gap-2 px-3.5 h-8 rounded-full text-sm font-semibold transition-colors ${
                           active
                             ? "bg-blue-500 text-white"
-                            : "bg-white/[0.04] text-slate-400 hover:text-white hover:bg-white/[0.08] border border-white/[0.06]"
+                            : "bg-white/[0.04] text-slate-300 hover:text-white hover:bg-white/[0.08] border border-white/[0.06]"
                         }`}
                       >
                         {f.label}
-                        <span className={`text-[10px] ${active ? "text-blue-100" : "text-slate-600"}`}>{cnt}</span>
+                        <span className={`text-xs ${active ? "text-blue-100" : "text-slate-500"}`}>{cnt}</span>
                       </button>
                     )
                   })}
@@ -877,11 +877,11 @@ export function LeadsPanel() {
               {/* Body */}
               <div className="flex-1 overflow-y-auto px-6 py-4">
                 {activityLoading ? (
-                  <div className="flex items-center justify-center py-12"><Loader2 className="h-5 w-5 animate-spin text-slate-500" /></div>
+                  <div className="flex items-center justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-slate-500" /></div>
                 ) : filtered.length === 0 ? (
                   <div className="text-center py-12">
-                    <Activity className="h-8 w-8 text-slate-700 mx-auto mb-2" />
-                    <p className="text-sm text-slate-500">
+                    <Activity className="h-10 w-10 text-slate-700 mx-auto mb-3" />
+                    <p className="text-base text-slate-400">
                       {activityLogs.length === 0 ? "No activity recorded yet." : "No events match your filter."}
                     </p>
                   </div>
@@ -889,10 +889,10 @@ export function LeadsPanel() {
                   <div className="space-y-6">
                     {buckets.filter(b => b.items.length > 0).map(bucket => (
                       <div key={bucket.label} data-testid={`activity-bucket-${bucket.label.toLowerCase().replace(/\s+/g, "-")}`}>
-                        <div className="flex items-center gap-2 mb-3 sticky top-0 bg-[#0d1117] py-1 z-[1]">
-                          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">{bucket.label}</p>
+                        <div className="flex items-center gap-2 mb-3 sticky top-0 bg-[#0d1117] py-1.5 z-[1]">
+                          <p className="text-xs font-bold text-slate-400 uppercase tracking-[0.2em]">{bucket.label}</p>
                           <div className="flex-1 h-px bg-white/[0.05]" />
-                          <span className="text-[10px] text-slate-600">{bucket.items.length}</span>
+                          <span className="text-xs text-slate-500 font-semibold">{bucket.items.length}</span>
                         </div>
                         <div className="space-y-2">
                           {bucket.items.map(log => {
@@ -901,15 +901,15 @@ export function LeadsPanel() {
                             return (
                               <div
                                 key={log.id}
-                                className="group flex gap-3 p-3 rounded-xl border border-white/[0.04] bg-white/[0.015] hover:bg-white/[0.04] hover:border-white/[0.08] transition-colors"
+                                className="group flex gap-3 p-3.5 rounded-xl border border-white/[0.04] bg-white/[0.015] hover:bg-white/[0.04] hover:border-white/[0.08] transition-colors"
                                 data-testid={`activity-event-${log.id}`}
                               >
-                                <div className={`flex-shrink-0 h-7 w-7 rounded-full bg-[#0d1117] border ${style.ring} flex items-center justify-center`}>
-                                  <div className={`h-2 w-2 rounded-full ${style.dot}`} />
+                                <div className={`flex-shrink-0 h-8 w-8 rounded-full bg-[#0d1117] border ${style.ring} flex items-center justify-center`}>
+                                  <div className={`h-2.5 w-2.5 rounded-full ${style.dot}`} />
                                 </div>
                                 <div className="min-w-0 flex-1">
                                   <div className="flex items-baseline gap-2 flex-wrap">
-                                    <p className="text-xs font-bold text-white">{log.action}</p>
+                                    <p className="text-sm font-bold text-white">{log.action}</p>
                                     {leadName ? (
                                       <button
                                         onClick={() => {
@@ -921,20 +921,20 @@ export function LeadsPanel() {
                                             el?.scrollIntoView({ behavior: "smooth", block: "center" })
                                           }, 100)
                                         }}
-                                        className="text-[10px] text-blue-300 hover:text-blue-200 border border-blue-500/20 bg-blue-500/[0.06] rounded-full px-2 py-0.5 transition-colors"
+                                        className="text-xs text-blue-300 hover:text-blue-200 border border-blue-500/20 bg-blue-500/[0.06] hover:bg-blue-500/[0.12] rounded-full px-2.5 py-0.5 font-semibold transition-colors"
                                         data-testid={`activity-jump-${log.leadId}`}
                                         title="Jump to this lead"
                                       >
                                         {leadName}
                                       </button>
                                     ) : (
-                                      <span className="text-[10px] text-slate-600 italic">lead removed</span>
+                                      <span className="text-xs text-slate-500 italic">lead removed</span>
                                     )}
                                   </div>
-                                  {log.details && <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">{log.details}</p>}
-                                  <p className="text-[10px] text-slate-600 mt-1">
+                                  {log.details && <p className="text-sm text-slate-300 mt-1 leading-relaxed">{log.details}</p>}
+                                  <p className="text-xs text-slate-500 mt-1.5">
                                     {fmtTime(log.timestamp)}
-                                    {log.actorName && <> · <span className="text-slate-500">{log.actorName}</span></>}
+                                    {log.actorName && <> · <span className="text-slate-400 font-medium">{log.actorName}</span></>}
                                   </p>
                                 </div>
                               </div>

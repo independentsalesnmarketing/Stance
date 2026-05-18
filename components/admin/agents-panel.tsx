@@ -97,6 +97,7 @@ export function AgentsPanel() {
   const [page, setPage]             = useState(1)
   const [selected, setSelected]     = useState<Set<string>>(new Set())
   const [bulkBusy, setBulkBusy]     = useState(false)
+  const [tierTab, setTierTab]       = useState<"all" | "tier1" | "tier2" | "untiered">("all")
 
   // Form state
   const [firstName, setFirstName]   = useState("")
@@ -249,21 +250,37 @@ export function AgentsPanel() {
     }`
 
   const PAGE_SIZE = 20
+
+  // Tier counts (shown in tab labels)
+  const tierCounts = useMemo(() => ({
+    all:      agents.length,
+    tier1:    agents.filter((a) => a.tier === 1).length,
+    tier2:    agents.filter((a) => a.tier === 2).length,
+    untiered: agents.filter((a) => a.tier !== 1 && a.tier !== 2).length,
+  }), [agents])
+
   const filtered = useMemo(() => {
     const q = search.toLowerCase()
-    if (!q) return agents
-    return agents.filter((a) =>
-      `${a.firstName} ${a.lastName}`.toLowerCase().includes(q) ||
-      a.email.toLowerCase().includes(q) ||
-      (a.phone || "").includes(q) ||
-      (a.approvedStates || []).some((s: string) => s.toLowerCase().includes(q))
-    )
-  }, [agents, search])
+    return agents.filter((a) => {
+      // Tier tab filter
+      if (tierTab === "tier1" && a.tier !== 1) return false
+      if (tierTab === "tier2" && a.tier !== 2) return false
+      if (tierTab === "untiered" && (a.tier === 1 || a.tier === 2)) return false
+      // Search filter
+      if (!q) return true
+      return (
+        `${a.firstName} ${a.lastName}`.toLowerCase().includes(q) ||
+        a.email.toLowerCase().includes(q) ||
+        (a.phone || "").includes(q) ||
+        (a.approvedStates || []).some((s: string) => s.toLowerCase().includes(q))
+      )
+    })
+  }, [agents, search, tierTab])
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
   const safePage = Math.min(page, totalPages)
   const paged = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
-  useEffect(() => { setPage(1) }, [search])
+  useEffect(() => { setPage(1) }, [search, tierTab])
 
   const allOnPageSelected = paged.length > 0 && paged.every((a) => selected.has(a.id))
   const toggleSelectAll = () => {
@@ -330,6 +347,40 @@ export function AgentsPanel() {
           </Button>
         </div>
       )}
+
+      {/* Tier tabs */}
+      <div className="flex items-center gap-1.5 flex-wrap border-b border-white/[0.06] pb-px">
+        {[
+          { key: "all",      label: "All Agents",   count: tierCounts.all,      accent: "blue" },
+          { key: "tier1",    label: "Tier 1",       count: tierCounts.tier1,    accent: "emerald" },
+          { key: "tier2",    label: "Tier 2",       count: tierCounts.tier2,    accent: "amber" },
+          ...(tierCounts.untiered > 0 ? [{ key: "untiered" as const, label: "Untiered", count: tierCounts.untiered, accent: "slate" as const }] : []),
+        ].map((t) => {
+          const active = tierTab === t.key
+          const activeCls =
+            t.accent === "emerald" ? "border-emerald-500 text-emerald-300 bg-emerald-500/[0.06]" :
+            t.accent === "amber"   ? "border-amber-500 text-amber-300 bg-amber-500/[0.06]" :
+            t.accent === "slate"   ? "border-slate-500 text-slate-200 bg-slate-500/[0.08]" :
+                                     "border-blue-500 text-blue-300 bg-blue-500/[0.06]"
+          return (
+            <button
+              key={t.key}
+              onClick={() => setTierTab(t.key as typeof tierTab)}
+              data-testid={`agent-tier-tab-${t.key}`}
+              className={`relative flex items-center gap-2 px-4 h-10 text-sm font-semibold rounded-t-xl border-b-2 transition-colors ${
+                active ? activeCls : "border-transparent text-slate-500 hover:text-slate-200 hover:bg-white/[0.03]"
+              }`}
+            >
+              {t.label}
+              <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                active ? "bg-white/[0.1] text-white" : "bg-white/[0.04] text-slate-500"
+              }`}>
+                {t.count}
+              </span>
+            </button>
+          )
+        })}
+      </div>
 
       {/* Search */}
       <div className="relative">
