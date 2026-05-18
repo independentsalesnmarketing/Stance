@@ -1,0 +1,120 @@
+// Stance Marketing — Apply Form Google Apps Script
+// Deploy as a standalone Web App at script.google.com
+//   Execute as: Me  |  Who has access: Anyone
+// After deploying, copy the web app URL into GOOGLE_APPLY_SCRIPT_URL in Vercel.
+
+function doPost(e) {
+  try {
+    var data = JSON.parse(e.postData.contents);
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var ts = Utilities.formatDate(new Date(), "America/New_York", "M/d/yyyy h:mm a") + " EST";
+    appendApplication(ss, data, ts);
+    return ContentService
+      .createTextOutput(JSON.stringify({ success: true }))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    return ContentService
+      .createTextOutput(JSON.stringify({ success: false, error: err.message }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+function getOrCreateSheet(ss, name, headers) {
+  var sheet = ss.getSheetByName(name);
+  if (!sheet) {
+    sheet = ss.insertSheet(name);
+    sheet.appendRow(headers);
+    var r = sheet.getRange(1, 1, 1, headers.length);
+    r.setBackground("#1a1a2e");
+    r.setFontColor("#ffffff");
+    r.setFontWeight("bold");
+    sheet.setFrozenRows(1);
+    for (var i = 1; i <= headers.length; i++) sheet.setColumnWidth(i, 160);
+  }
+  return sheet;
+}
+
+// ── Email helpers ─────────────────────────────────────────────────
+
+function emailWrap(bodyHtml) {
+  return '<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body style="margin:0;padding:0;background:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',Roboto,sans-serif;">'
+    + '<table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:32px 16px;">'
+    + '<tr><td align="center">'
+    + '<table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">'
+    + '<tr><td style="background:#0f172a;border-radius:16px 16px 0 0;padding:28px 32px;">'
+    + '<p style="margin:0;font-size:22px;font-weight:800;color:#ffffff;letter-spacing:0.12em;text-transform:uppercase;">STANCE</p>'
+    + '<p style="margin:4px 0 0;font-size:12px;color:#64748b;letter-spacing:0.08em;text-transform:uppercase;">Independent Sales &amp; Marketing</p>'
+    + '</td></tr>'
+    + '<tr><td style="background:#ffffff;padding:32px;border-radius:0 0 16px 16px;border:1px solid #e2e8f0;border-top:none;">'
+    + bodyHtml
+    + '</td></tr>'
+    + '<tr><td style="padding:20px 0 0;text-align:center;">'
+    + '<p style="margin:0;font-size:11px;color:#94a3b8;">stance-marketing.com &nbsp;·&nbsp; Confidential</p>'
+    + '</td></tr>'
+    + '</table>'
+    + '</td></tr></table></body></html>';
+}
+
+function sectionHeader(label) {
+  return '<p style="margin:24px 0 10px;font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.15em;border-bottom:1px solid #f1f5f9;padding-bottom:6px;">' + label + '</p>';
+}
+
+function row(label, value) {
+  if (!value || value === "—") return '';
+  return '<tr>'
+    + '<td style="padding:5px 0;font-size:13px;color:#64748b;width:38%;vertical-align:top;">' + label + '</td>'
+    + '<td style="padding:5px 0;font-size:13px;color:#1e293b;font-weight:500;">' + value + '</td>'
+    + '</tr>';
+}
+
+// ── Application ───────────────────────────────────────────────────
+
+function appendApplication(ss, data, ts) {
+  var headers = [
+    "Timestamp", "Name", "Email", "Phone", "State", "Company", "Program",
+    "Referral Method", "Industry",
+    "Sales Experience", "Preferred Channel", "Territory Preference",
+    "Business Type", "Forecasted Monthly Sales",
+    "Event Experience", "Prior Carriers", "Has Transportation",
+    "D2D Experience", "Team Size", "Territory Interest",
+    "Additional Notes", "Details Snapshot"
+  ];
+  var sheet = getOrCreateSheet(ss, "Applications", headers);
+  sheet.appendRow([
+    ts,
+    data.name || "", data.email || "", data.phone || "",
+    data.state || "", data.company || "", data.program || "",
+    data.referralMethod || "", data.industry || "",
+    data.salesExperience || "", data.preferredChannel || "", data.territoryPreference || "",
+    data.businessType || "", data.customerBase || "",
+    data.eventExperience || "", data.previousCarriers || "", data.hasTransportation || "",
+    data.d2dExperience || "", data.teamSize || "", data.territoryInterest || "",
+    data.additionalNotes || "", data.details || ""
+  ]);
+  sendApplicationEmail(data, ts);
+}
+
+function sendApplicationEmail(data, ts) {
+  var recipient = "gamblerspassion@gmail.com";
+  var subject = "New Stance Application — " + (data.name || "Unknown") + " (" + (data.program || "Unknown") + ")";
+
+  var bodyHtml = '<h2 style="margin:0 0 4px;font-size:20px;font-weight:700;color:#0f172a;">New Partner Application</h2>'
+    + '<p style="margin:0 0 8px;font-size:13px;color:#64748b;">Submitted ' + (ts || "") + '</p>'
+    + sectionHeader("Applicant")
+    + '<table cellpadding="0" cellspacing="0" width="100%">'
+    + row("Name", data.name)
+    + row("Email", data.email)
+    + row("Phone", data.phone)
+    + row("State", data.state)
+    + row("Company", data.company)
+    + row("Program", data.program)
+    + '</table>';
+
+  var details = data.details || "";
+  if (details) {
+    bodyHtml += sectionHeader("Program Details")
+      + '<p style="font-size:13px;color:#1e293b;line-height:1.6;">' + details.replace(/\|/g, '<br>') + '</p>';
+  }
+
+  MailApp.sendEmail(recipient, subject, "", { htmlBody: emailWrap(bodyHtml) });
+}
