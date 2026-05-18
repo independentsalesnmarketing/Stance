@@ -64,32 +64,29 @@ function appendOnboarding(ss, data, timestamp) {
     data.idDocUrl||"", data.badgePhotoUrl||"", data.onboardingPdfUrl||"",
     data.token||""
   ]);
-  sendOnboardingEmail(data, timestamp);
+  sendOnboardingEmail(data, timestamp, address);
 }
 
-function sendOnboardingEmail(data, timestamp) {
+function sendOnboardingEmail(data, timestamp, address) {
   var recipient = "gamblerspassion@gmail.com";
   var subject = "Stance Onboarding Complete - " + (data.legalName || "Unknown") + " (" + (data.program || "Unknown") + ")";
-  var address = [data.address, data.city, data.state && data.zipCode ? data.state + " " + data.zipCode : data.state || data.zipCode]
-    .filter(Boolean).join(", ");
-  var body = "Onboarding Complete\n\n"
-    + "Legal Name: " + (data.legalName || "") + "\n"
-    + "DBA / Company: " + (data.dbaName || "") + "\n"
-    + "Entity Type: " + (data.entityType || "") + "\n"
-    + "Email: " + (data.email || "") + "\n"
-    + "Phone: " + (data.phone || "") + "\n"
-    + "Address: " + address + "\n"
-    + "Program: " + (data.program || "") + "\n"
-    + "TIN Type: " + (data.tinType || "") + "\n"
-    + "Bank Name: " + (data.bankName || "") + "\n"
-    + "Account Type: " + (data.accountType || "") + "\n\n"
-    + "Submitted: " + (timestamp || "");
-
-  if (data.idDocUrl) body += "\nGovernment ID: " + data.idDocUrl;
-  if (data.badgePhotoUrl) body += "\nBadge Photo: " + data.badgePhotoUrl;
-  if (data.onboardingPdfUrl) body += "\nOnboarding PDF: " + data.onboardingPdfUrl;
-
-  MailApp.sendEmail(recipient, subject, body);
+  var html = "<h2>Onboarding Complete</h2>"
+    + "<p><b>Submitted:</b> " + (timestamp || "") + "</p><hr>"
+    + "<p><b>Legal Name:</b> " + (data.legalName || "") + "</p>"
+    + "<p><b>DBA / Company:</b> " + (data.dbaName || "") + "</p>"
+    + "<p><b>Entity Type:</b> " + (data.entityType || "") + "</p>"
+    + "<p><b>Email:</b> " + (data.email || "") + "</p>"
+    + "<p><b>Phone:</b> " + (data.phone || "") + "</p>"
+    + "<p><b>Address:</b> " + (address || "") + "</p>"
+    + "<p><b>Program:</b> " + (data.program || "") + "</p>"
+    + "<p><b>TIN Type:</b> " + (data.tinType || "") + "</p>"
+    + "<hr>"
+    + "<p><b>Bank Name:</b> " + (data.bankName || "") + "</p>"
+    + "<p><b>Account Type:</b> " + (data.accountType || "") + "</p>";
+  if (data.idDocUrl) html += "<p><b>Government ID:</b> <a href='" + data.idDocUrl + "'>View</a></p>";
+  if (data.badgePhotoUrl) html += "<p><b>Badge Photo:</b> <a href='" + data.badgePhotoUrl + "'>View</a></p>";
+  if (data.onboardingPdfUrl) html += "<p><b>Onboarding PDF:</b> <a href='" + data.onboardingPdfUrl + "'>Download</a></p>";
+  MailApp.sendEmail(recipient, subject, "", { htmlBody: html });
 }
 
 function appendApplication(ss, data, timestamp) {

@@ -62,14 +62,14 @@ function appendApplication(ss, data, ts) {
 function sendApplicationEmail(data, ts) {
   var recipient = "gamblerspassion@gmail.com";
   var subject = "New Stance Application - " + (data.name || "Unknown") + " (" + (data.program || "Unknown") + ")";
-  var body = "New Partner Application\n\n"
-    + "Name: " + (data.name || "") + "\n"
-    + "Email: " + (data.email || "") + "\n"
-    + "Phone: " + (data.phone || "") + "\n"
-    + "State: " + (data.state || "") + "\n"
-    + "Company: " + (data.company || "") + "\n"
-    + "Program: " + (data.program || "") + "\n\n"
-    + "Details: " + (data.details || "") + "\n\n"
-    + "Submitted: " + (ts || "");
-  MailApp.sendEmail(recipient, subject, body);
+  var html = "<h2>New Partner Application</h2>"
+    + "<p><b>Submitted:</b> " + (ts || "") + "</p><hr>"
+    + "<p><b>Name:</b> " + (data.name || "") + "</p>"
+    + "<p><b>Email:</b> " + (data.email || "") + "</p>"
+    + "<p><b>Phone:</b> " + (data.phone || "") + "</p>"
+    + "<p><b>State:</b> " + (data.state || "") + "</p>"
+    + "<p><b>Company:</b> " + (data.company || "") + "</p>"
+    + "<p><b>Program:</b> " + (data.program || "") + "</p>"
+    + "<p><b>Details:</b> " + (data.details || "") + "</p>";
+  MailApp.sendEmail(recipient, subject, "", { htmlBody: html });
 }
