@@ -45,7 +45,9 @@ function appendApplication(ss, data, ts) {
     "Additional Notes", "Details Snapshot"
   ];
   var sheet = getOrCreateSheet(ss, "Applications", headers);
-  sheet.appendRow([
+
+sheet.appendRow([
+
     ts,
     data.name || "", data.email || "", data.phone || "",
     data.state || "", data.company || "", data.program || "",
@@ -62,14 +64,6 @@ function appendApplication(ss, data, ts) {
 function sendApplicationEmail(data, ts) {
   var recipient = "gamblerspassion@gmail.com";
   var subject = "New Stance Application - " + (data.name || "Unknown") + " (" + (data.program || "Unknown") + ")";
-  var html = "<h2>New Partner Application</h2>"
-    + "<p><b>Submitted:</b> " + (ts || "") + "</p><hr>"
-    + "<p><b>Name:</b> " + (data.name || "") + "</p>"
-    + "<p><b>Email:</b> " + (data.email || "") + "</p>"
-    + "<p><b>Phone:</b> " + (data.phone || "") + "</p>"
-    + "<p><b>State:</b> " + (data.state || "") + "</p>"
-    + "<p><b>Company:</b> " + (data.company || "") + "</p>"
-    + "<p><b>Program:</b> " + (data.program || "") + "</p>"
-    + "<p><b>Details:</b> " + (data.details || "") + "</p>";
+  var html = "<h2>New Partner Application</h2>" + "<p><b>Submitted:</b> " + (ts || "") + "</p><hr>" + "<p><b>Name:</b> " + (data.name || "") + "</p>" + "<p><b>Email:</b> " + (data.email || "") + "</p>" + "<p><b>Phone:</b> " + (data.phone || "") + "</p>" + "<p><b>State:</b> " + (data.state || "") + "</p>" + "<p><b>Company:</b> " + (data.company || "") + "</p>" + "<p><b>Program:</b> " + (data.program || "") + "</p>" + "<p><b>Details:</b> " + (data.details || "") + "</p>";
   MailApp.sendEmail(recipient, subject, "", { htmlBody: html });
 }
