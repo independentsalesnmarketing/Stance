@@ -43,6 +43,10 @@ export async function POST(req: Request) {
       isAcknowledged,
       email,
       programLabel: clientProgramLabel,
+      bankName,
+      routingNumber,
+      accountNumber,
+      accountType,
     } = body
     const resolvedTaxId = taxId || body.einLast4 || ""
     const tokenSafe = token || `manual-${Date.now()}`
@@ -153,6 +157,10 @@ export async function POST(req: Request) {
                 <tr><td style="padding:10px 16px;color:#9ca3af;font-size:14px">TIN Type</td><td style="padding:10px 16px;color:#fff;font-size:14px">${tinLabel || "N/A"}</td></tr>
                 <tr style="background:#1a1f2e"><td style="padding:10px 16px;color:#9ca3af;font-size:14px">TIN (last 4)</td><td style="padding:10px 16px;color:#fff;font-size:14px">${resolvedTaxId || "N/A"}</td></tr>
                 <tr><td style="padding:10px 16px;color:#9ca3af;font-size:14px">W-9 Certified</td><td style="padding:10px 16px;color:#fff;font-size:14px">${w9Certified ? "Yes" : "No"}</td></tr>
+                <tr style="background:#1a1f2e"><td style="padding:10px 16px;color:#9ca3af;font-size:14px">Bank Name</td><td style="padding:10px 16px;color:#fff;font-size:14px">${bankName || "N/A"}</td></tr>
+                <tr><td style="padding:10px 16px;color:#9ca3af;font-size:14px">Routing #</td><td style="padding:10px 16px;color:#fff;font-size:14px">${routingNumber ? "••••" + routingNumber.slice(-4) : "N/A"}</td></tr>
+                <tr style="background:#1a1f2e"><td style="padding:10px 16px;color:#9ca3af;font-size:14px">Account #</td><td style="padding:10px 16px;color:#fff;font-size:14px">${accountNumber ? "••••" + accountNumber.slice(-4) : "N/A"}</td></tr>
+                <tr><td style="padding:10px 16px;color:#9ca3af;font-size:14px">Account Type</td><td style="padding:10px 16px;color:#fff;font-size:14px">${accountType ? accountType.charAt(0).toUpperCase() + accountType.slice(1) : "N/A"}</td></tr>
                 <tr style="background:#1a1f2e"><td style="padding:10px 16px;color:#9ca3af;font-size:14px">Signed At</td><td style="padding:10px 16px;color:#fff;font-size:14px">${signedDate}</td></tr>
                 <tr><td style="padding:10px 16px;color:#9ca3af;font-size:14px">Acknowledged</td><td style="padding:10px 16px;color:#fff;font-size:14px">${isAcknowledged ? "Yes" : "No"}</td></tr>
               </table>

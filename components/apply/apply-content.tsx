@@ -559,6 +559,20 @@ export function ApplyContent() {
                     Thanks {formData.firstName}. Your {selectedProgram?.title || "partner"} application is in our queue. We&apos;ll review your submission and contact you with onboarding steps.
                   </p>
 
+                  <div className="rounded-xl border border-blue-400/30 bg-blue-500/10 px-5 py-4 mb-6">
+                    <p className="text-sm text-blue-100 font-semibold mb-1">Want to expedite the application process?</p>
+                    <p className="text-sm text-white/70">
+                      Email Director of Sales <span className="font-semibold text-white">Justin Johnson</span> at{" "}
+                      <a
+                        href="mailto:justin.j@stance-marketing.com"
+                        data-testid="expedite-email-link"
+                        className="text-blue-300 hover:text-blue-200 underline underline-offset-2 font-semibold transition-colors"
+                      >
+                        justin.j@stance-marketing.com
+                      </a>
+                    </p>
+                  </div>
+
                   <div className="grid sm:grid-cols-3 gap-3">
                     {[
                       { label: "Status", value: "In Review" },

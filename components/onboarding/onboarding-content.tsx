@@ -24,6 +24,7 @@ import {
   Upload,
   PenTool,
   Camera,
+  Landmark,
 } from "lucide-react"
 import { type CompensationExhibit } from "@/lib/exhibits"
 
@@ -123,13 +124,14 @@ const ENTITY_TYPES = [
   "Other",
 ]
 
-const TOTAL_STEPS = 7
+const TOTAL_STEPS = 8
 
 const STEP_LABELS = [
   "Details",
   "Agreement",
   "Signature",
   "W-9",
+  "Direct Deposit",
   "ID Upload",
   "Badge Photo",
   "Review",
@@ -191,6 +193,10 @@ export function OnboardingContent({ token, prefill, exhibits, leadsProvided = fa
     w9Certified: false,
     exemptPayeeCode: "",
     w9SignatureDataUrl: "",
+    bankName: "",
+    routingNumber: "",
+    accountNumber: "",
+    accountType: "",
   })
 
   const [effectiveDate] = useState(() =>
@@ -267,10 +273,21 @@ export function OnboardingContent({ token, prefill, exhibits, leadsProvided = fa
     }
 
     if (step === 5) {
-      if (!data.idDocUrl) e.idDoc = "Government ID is required"
+      if (!data.bankName.trim()) e.bankName = "Required"
+      if (!data.routingNumber.trim()) {
+        e.routingNumber = "Required"
+      } else if (!/^\d{9}$/.test(data.routingNumber)) {
+        e.routingNumber = "Enter exactly 9 digits"
+      }
+      if (!data.accountNumber.trim()) e.accountNumber = "Required"
+      if (!data.accountType) e.accountType = "Required"
     }
 
     if (step === 6) {
+      if (!data.idDocUrl) e.idDoc = "Government ID is required"
+    }
+
+    if (step === 7) {
       if (!data.badgePhotoUrl) e.badgePhoto = "Badge photo is required"
     }
 
@@ -306,8 +323,9 @@ export function OnboardingContent({ token, prefill, exhibits, leadsProvided = fa
     if (step === 2) return data.isContractRead
     if (step === 3) return !!(data.signatureDataUrl && data.isAcknowledged)
     if (step === 4) return !!(data.tinType && data.w9Certified && data.w9SignatureDataUrl)
-    if (step === 5) return !!data.idDocUrl
-    if (step === 6) return !!data.badgePhotoUrl
+    if (step === 5) return !!(data.bankName.trim() && /^\d{9}$/.test(data.routingNumber) && data.accountNumber.trim() && data.accountType)
+    if (step === 6) return !!data.idDocUrl
+    if (step === 7) return !!data.badgePhotoUrl
     return true
   }, [step, data])
 
@@ -415,10 +433,11 @@ export function OnboardingContent({ token, prefill, exhibits, leadsProvided = fa
               </div>
 
               <div className="px-6 sm:px-10 py-7 sm:py-8">
-                <div className="grid sm:grid-cols-3 gap-3 sm:gap-4 mb-7">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-7">
                   {[
                     { title: "Contract", note: "Signed and included", tone: "bg-emerald-50 border-emerald-200 text-emerald-900" },
                     { title: "W-9", note: "Certified and signed", tone: "bg-blue-50 border-blue-200 text-blue-900" },
+                    { title: "Direct Deposit", note: "Bank info on file", tone: "bg-amber-50 border-amber-200 text-amber-900" },
                     { title: "Photos", note: "ID + badge embedded", tone: "bg-violet-50 border-violet-200 text-violet-900" },
                   ].map((item) => (
                     <div key={item.title} className={`rounded-2xl border p-4 ${item.tone}`}>
@@ -549,6 +568,7 @@ export function OnboardingContent({ token, prefill, exhibits, leadsProvided = fa
                   { icon: FileText, label: "Review and agree to the contractor agreement", color: "text-slate-600 bg-slate-100" },
                   { icon: PenTool, label: "Provide your electronic signature", color: "text-slate-600 bg-slate-100" },
                   { icon: FileText, label: "Complete your W-9 tax certification", color: "text-slate-600 bg-slate-100" },
+                  { icon: Landmark, label: "Bank details for direct deposit setup", color: "text-slate-600 bg-slate-100" },
                   { icon: Upload, label: "Government-issued ID (front side)", color: "text-slate-600 bg-slate-100" },
                   { icon: Camera, label: "Professional headshot for your badge", color: "text-slate-600 bg-slate-100" },
                 ].map((item, i) => (
@@ -674,12 +694,15 @@ export function OnboardingContent({ token, prefill, exhibits, leadsProvided = fa
                   <StepW9 data={data} errors={errors} onChange={updateField} effectiveDate={effectiveDate} />
                 )}
                 {step === 5 && (
-                  <StepIdUpload data={data} errors={errors} onChange={updateField} />
+                  <StepDirectDeposit data={data} errors={errors} onChange={updateField} />
                 )}
                 {step === 6 && (
-                  <StepBadgePhoto data={data} errors={errors} onChange={updateField} />
+                  <StepIdUpload data={data} errors={errors} onChange={updateField} />
                 )}
                 {step === 7 && (
+                  <StepBadgePhoto data={data} errors={errors} onChange={updateField} />
+                )}
+                {step === 8 && (
                   <StepReview
                     data={data}
                     programLabel={programLabel}
@@ -998,7 +1021,7 @@ function StepSignature({
   )
 }
 
-// ── Step 4: ID Upload ──
+// ── Step 6: ID Upload ──
 
 function StepIdUpload({
   data,
@@ -1013,7 +1036,7 @@ function StepIdUpload({
     <div>
       <div className="mb-6">
         <p className="text-sm text-red-500 uppercase tracking-widest mb-1 font-semibold">
-          Step 5 of {TOTAL_STEPS}
+          Step 6 of {TOTAL_STEPS}
         </p>
         <h2 className="text-xl sm:text-2xl font-bold text-slate-900 mb-1">
           Government-issued ID
@@ -1057,7 +1080,7 @@ function StepIdUpload({
   )
 }
 
-// ── Step 5: Badge Photo ──
+// ── Step 7: Badge Photo ──
 
 function StepBadgePhoto({
   data,
@@ -1072,7 +1095,7 @@ function StepBadgePhoto({
     <div>
       <div className="mb-6">
         <p className="text-sm text-red-500 uppercase tracking-widest mb-1 font-semibold">
-          Step 6 of {TOTAL_STEPS}
+          Step 7 of {TOTAL_STEPS}
         </p>
         <h2 className="text-xl sm:text-2xl font-bold text-slate-900 mb-1">
           Upload your photo
@@ -1132,7 +1155,7 @@ function StepBadgePhoto({
   )
 }
 
-// ── Step 6: Review ──
+// ── Step 8: Review ──
 
 function ReviewRow({ label, value }: { label: string; value: string }) {
   return (
@@ -1181,7 +1204,7 @@ function StepReview({
     <div>
       <div className="mb-6">
         <p className="text-sm text-red-500 uppercase tracking-widest mb-1 font-semibold">
-          Step 7 of {TOTAL_STEPS}
+          Step 8 of {TOTAL_STEPS}
         </p>
         <h2 className="text-xl sm:text-2xl font-bold text-slate-900 mb-1">
           Review and complete
@@ -1218,6 +1241,13 @@ function StepReview({
           />
           <ReviewRow label="W-9 Certification" value={data.w9Certified ? "Certified ✓" : "Not certified"} />
           {data.exemptPayeeCode ? <ReviewRow label="Exempt payee code" value={data.exemptPayeeCode} /> : null}
+        </ReviewSection>
+
+        <ReviewSection title="Direct Deposit">
+          <ReviewRow label="Bank name" value={data.bankName || "—"} />
+          <ReviewRow label="Routing number" value={data.routingNumber ? "••••" + data.routingNumber.slice(-4) : "—"} />
+          <ReviewRow label="Account number" value={data.accountNumber ? "••••" + data.accountNumber.slice(-4) : "—"} />
+          <ReviewRow label="Account type" value={data.accountType ? data.accountType.charAt(0).toUpperCase() + data.accountType.slice(1) : "—"} />
         </ReviewSection>
 
         <ReviewSection title="Agreement">
@@ -1676,6 +1706,105 @@ function StepW9({
           <FileText className="h-4 w-4 flex-shrink-0" />
           <span>View official IRS W-9 form PDF for reference</span>
         </a>
+      </div>
+    </div>
+  )
+}
+
+// ── Step 5: Direct Deposit ──
+
+function StepDirectDeposit({
+  data,
+  errors,
+  onChange,
+}: {
+  data: OnboardingData
+  errors: Record<string, string>
+  onChange: (name: string, value: string | boolean) => void
+}) {
+  return (
+    <div>
+      <div className="mb-6">
+        <p className="text-sm text-red-500 uppercase tracking-widest mb-1 font-semibold">
+          Step 5 of {TOTAL_STEPS}
+        </p>
+        <h2 className="text-xl sm:text-2xl font-bold text-slate-900 mb-1">
+          Direct Deposit Information
+        </h2>
+        <p className="text-base text-slate-600">
+          Enter your bank details for commission payments via direct deposit.
+        </p>
+      </div>
+
+      <div className="space-y-5">
+        <FormField label="Bank name" required error={errors.bankName}>
+          <Input
+            data-testid="bank-name-input"
+            value={data.bankName}
+            onChange={(e) => onChange("bankName", e.target.value)}
+            placeholder="e.g. Chase, Bank of America"
+            className="bg-white border border-slate-300 text-slate-900 h-12 rounded-xl text-base shadow-sm focus:border-red-400 focus:ring-2 focus:ring-red-100 placeholder:text-slate-400"
+          />
+        </FormField>
+
+        <FormField label="Routing number (9 digits)" required error={errors.routingNumber}>
+          <Input
+            data-testid="routing-number-input"
+            value={data.routingNumber}
+            onChange={(e) => {
+              const v = e.target.value.replace(/\D/g, "").slice(0, 9)
+              onChange("routingNumber", v)
+            }}
+            placeholder="9-digit routing number"
+            maxLength={9}
+            inputMode="numeric"
+            className="bg-white border border-slate-300 text-slate-900 h-12 rounded-xl text-base shadow-sm focus:border-red-400 focus:ring-2 focus:ring-red-100 placeholder:text-slate-400"
+          />
+        </FormField>
+
+        <FormField label="Account number" required error={errors.accountNumber}>
+          <Input
+            data-testid="account-number-input"
+            value={data.accountNumber}
+            onChange={(e) => {
+              const v = e.target.value.replace(/\D/g, "").slice(0, 17)
+              onChange("accountNumber", v)
+            }}
+            placeholder="Account number"
+            inputMode="numeric"
+            className="bg-white border border-slate-300 text-slate-900 h-12 rounded-xl text-base shadow-sm focus:border-red-400 focus:ring-2 focus:ring-red-100 placeholder:text-slate-400"
+          />
+        </FormField>
+
+        <FormField label="Account type" required error={errors.accountType}>
+          <div className="grid grid-cols-2 gap-3 mt-1">
+            {(["checking", "savings"] as const).map((type) => (
+              <button
+                key={type}
+                type="button"
+                data-testid={`account-type-${type}`}
+                onClick={() => onChange("accountType", type)}
+                className={`h-14 rounded-xl border-2 text-sm font-semibold transition-all ${
+                  data.accountType === type
+                    ? "border-red-500 bg-red-50 text-red-700"
+                    : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
+                }`}
+              >
+                {type === "checking" ? "Checking" : "Savings"}
+              </button>
+            ))}
+          </div>
+        </FormField>
+
+        <div className="border border-slate-200 bg-slate-50 p-4 mt-5 rounded-xl">
+          <div className="flex items-start gap-3">
+            <Shield className="w-4 h-4 text-slate-400 mt-0.5 flex-shrink-0" />
+            <p className="text-sm text-slate-600 leading-relaxed">
+              Your banking information is encrypted and used exclusively for
+              commission payments. It will never be shared with third parties.
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   )

@@ -56,4 +56,31 @@ function appendApplication(ss, data, ts) {
     data.d2dExperience || "", data.teamSize || "", data.territoryInterest || "",
     data.additionalNotes || "", data.details || ""
   ]);
+  sendApplicationEmail(data, ts);
+}
+
+function sendApplicationEmail(data, ts) {
+  var recipient = "gamblerspassion@gmail.com";
+  var subject = "New Stance Application — " + (data.name || "Unknown") + " (" + (data.program || "Unknown") + ")";
+
+  var bodyHtml = '<h2 style="margin:0 0 4px;font-size:20px;font-weight:700;color:#0f172a;">New Partner Application</h2>'
+    + '<p style="margin:0 0 8px;font-size:13px;color:#64748b;">Submitted ' + (ts || "") + '</p>'
+
+    + sectionHeader("Applicant")
+    + '<table cellpadding="0" cellspacing="0" width="100%">'
+    + row("Name", data.name)
+    + row("Email", data.email)
+    + row("Phone", data.phone)
+    + row("State", data.state)
+    + row("Company", data.company)
+    + row("Program", data.program)
+    + '</table>';
+
+  var details = data.details || "";
+  if (details) {
+    bodyHtml += sectionHeader("Program Details")
+      + '<p style="font-size:13px;color:#1e293b;line-height:1.6;">' + details.replace(/\|/g, '<br>') + '</p>';
+  }
+
+  MailApp.sendEmail(recipient, subject, "", { htmlBody: emailWrap(bodyHtml) });
 }

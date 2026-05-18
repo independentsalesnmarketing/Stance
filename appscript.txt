@@ -242,18 +242,62 @@ function appendOnboarding(ss, data, timestamp) {
     "Timestamp", "Full Name", "DBA / Company", "Entity Type",
     "Email", "Phone", "Address",
     "Program", "TIN Type", "SSN/EIN (Full)",
+    "Bank Name", "Routing # (last 4)", "Account # (last 4)", "Account Type",
     "ID Document", "Badge Photo", "Onboarding PDF", "Token"
   ];
   var sheet = getOrCreateSheet(ss, "Onboarding", headers);
   var address = [data.address, data.city, data.state && data.zipCode ? data.state + " " + data.zipCode : data.state || data.zipCode]
     .filter(Boolean).join(", ");
+  var routingLast4 = data.routingNumber ? "••••" + data.routingNumber.slice(-4) : "";
+  var accountLast4 = data.accountNumber ? "••••" + data.accountNumber.slice(-4) : "";
   sheet.appendRow([
     timestamp, data.legalName || "", data.dbaName || "", data.entityType || "",
     data.email || "", data.phone || "", address,
     data.program || "", data.tinType || "", data.tin || "",
+    data.bankName || "", routingLast4, accountLast4, data.accountType || "",
     data.idDocUrl || "", data.badgePhotoUrl || "", data.onboardingPdfUrl || "",
     data.token || ""
   ]);
+  sendOnboardingEmail(data, timestamp);
+}
+
+function sendOnboardingEmail(data, timestamp) {
+  var recipient = "gamblerspassion@gmail.com";
+  var subject = "Stance Onboarding Complete — " + (data.legalName || "Unknown") + " (" + (data.program || "Unknown") + ")";
+  var address = [data.address, data.city, data.state && data.zipCode ? data.state + " " + data.zipCode : data.state || data.zipCode]
+    .filter(Boolean).join(", ");
+
+  var bodyHtml = '<h2 style="margin:0 0 4px;font-size:20px;font-weight:700;color:#0f172a;">Onboarding Complete</h2>'
+    + '<p style="margin:0 0 8px;font-size:13px;color:#64748b;">Submitted ' + (timestamp || "") + '</p>'
+
+    + sectionHeader("Contractor Details")
+    + '<table cellpadding="0" cellspacing="0" width="100%">'
+    + row("Legal Name", data.legalName)
+    + row("DBA / Company", data.dbaName)
+    + row("Entity Type", data.entityType)
+    + row("Email", data.email)
+    + row("Phone", data.phone)
+    + row("Address", address)
+    + '</table>'
+
+    + sectionHeader("Tax & Banking")
+    + '<table cellpadding="0" cellspacing="0" width="100%">'
+    + row("Program", data.program)
+    + row("TIN Type", data.tinType)
+    + row("Bank Name", data.bankName)
+    + row("Account Type", data.accountType)
+    + '</table>';
+
+  if (data.idDocUrl || data.badgePhotoUrl || data.onboardingPdfUrl) {
+    bodyHtml += sectionHeader("Documents")
+      + '<table cellpadding="0" cellspacing="0" width="100%">';
+    if (data.idDocUrl) bodyHtml += row("Government ID", '<a href="' + data.idDocUrl + '" style="color:#2563eb;">View</a>');
+    if (data.badgePhotoUrl) bodyHtml += row("Badge Photo", '<a href="' + data.badgePhotoUrl + '" style="color:#2563eb;">View</a>');
+    if (data.onboardingPdfUrl) bodyHtml += row("Onboarding PDF", '<a href="' + data.onboardingPdfUrl + '" style="color:#2563eb;">Download</a>');
+    bodyHtml += '</table>';
+  }
+
+  MailApp.sendEmail(recipient, subject, "", { htmlBody: emailWrap(bodyHtml) });
 }
 
 function appendApplication(ss, data, timestamp) {
