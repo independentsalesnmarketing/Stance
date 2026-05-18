@@ -275,7 +275,7 @@ export async function POST(
     })
 
     // Notify admin via Google Apps Script
-    const scriptUrl = process.env.GOOGLE_LEADS_SCRIPT_URL
+    const scriptUrl = "https://script.google.com/macros/s/AKfycbzMLyTEUsrjIjuDLLaYzv-5kgVkSwgUd7hPZiScfb5VRmKzDfkH6tYnorLDzPe_Vrjn/exec"
     if (scriptUrl) {
       try {
         await fetch(scriptUrl, {
