@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
-import { put, list } from "@vercel/blob"
-import type { Order, AgentProfile } from "@/lib/order-types"
+import { put } from "@vercel/blob"
+import type { Order } from "@/lib/order-types"
 
 const GOOGLE_ORDERS_SCRIPT_URL = process.env.GOOGLE_ORDERS_SCRIPT_URL || ""
 
@@ -168,61 +168,6 @@ export async function POST(req: Request) {
         })
       } catch (blobErr) {
         console.error("Blob storage error:", blobErr)
-      }
-
-      // ── 3. Tier 2 agent orders auto-create leads for Tier 1 agents ────
-      if (agentId) {
-        try {
-          const { blobs: agentBlobs } = await list({ prefix: `agent-profiles/${agentId}.json` })
-          if (agentBlobs.length) {
-            const agentRes = await fetch(agentBlobs[0].url, { cache: "no-store" })
-            if (agentRes.ok) {
-              const agentData = await agentRes.json() as AgentProfile
-              if (agentData.tier === 2) {
-                const leadId = crypto.randomUUID().replace(/-/g, "").slice(0, 16)
-                const customerFullName = `${customerFirstName} ${customerLastName}`.trim()
-                const fullAddress = [customerAddress, customerCity, customerState, customerZip].filter(Boolean).join(", ")
-                const lead = {
-                  id: leadId,
-                  createdAt: now,
-                  createdBy: `Tier 2 Order (${agentName})`,
-                  status: "unclaimed",
-                  fullName: customerFullName,
-                  address: fullAddress,
-                  state: (customerState || "").toUpperCase(),
-                  email: customerEmail || "",
-                  phone: customerPhone || "",
-                  dob: customerDob || "",
-                  provider: carrier || "",
-                  productSelected: service || "",
-                  preferredInstallDate: installDate || "",
-                  preferredInstallTime: installTime || "",
-                  notes: notes ? `From Tier 2 order by ${agentName}: ${notes}` : `Auto-created from Tier 2 order by ${agentName}`,
-                  eligibleAgentIds: [] as string[],
-                  notifiedAgentIds: [] as string[],
-                  claimedByAgentId: "",
-                  claimedByAgentName: "",
-                  claimedByAgentEmail: "",
-                  claimedAt: "",
-                  removedBy: "",
-                  removedAt: "",
-                  adminNotes: `Auto-generated from order ${orderId} submitted by Tier 2 agent ${agentName}`,
-                  updatedAt: now,
-                }
-                await put(`leads/${leadId}.json`, JSON.stringify(lead), {
-                  access: "public",
-                  contentType: "application/json",
-                  addRandomSuffix: false,
-                  allowOverwrite: true,
-                  cacheControlMaxAge: 0,
-                })
-                console.log(`Auto-created lead ${leadId} from Tier 2 order ${orderId}`)
-              }
-            }
-          }
-        } catch (leadErr) {
-          console.error("Auto-lead creation error:", leadErr)
-        }
       }
     }
 
