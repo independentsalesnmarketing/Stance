@@ -80,6 +80,8 @@ export function LeadsPanel() {
   const [showActivity, setShowActivity] = useState(false)
   const [activityLogs, setActivityLogs] = useState<LeadActivityLog[]>([])
   const [activityLoading, setActivityLoading] = useState(false)
+  const [activitySearch, setActivitySearch] = useState("")
+  const [activityFilter, setActivityFilter] = useState<"all" | "notify" | "claim" | "order" | "removed">("all")
 
   // Agent selection for notification
   const [selectedAgents, setSelectedAgents] = useState<Set<string>>(new Set())
@@ -131,6 +133,13 @@ export function LeadsPanel() {
     const ts = new Date(l.timestamp).getTime()
     return !isNaN(ts) && (Date.now() - ts) < 24 * 60 * 60 * 1000
   }).length
+
+  // Quick lookup: leadId → display name (for activity modal "jump to lead" chip)
+  const leadNameMap = useMemo(() => {
+    const m = new Map<string, string>()
+    for (const l of leads) m.set(l.id, l.fullName || "(no name)")
+    return m
+  }, [leads])
 
   // Activity icon + accent color per action type
   const activityStyle = (action: string): { dot: string; ring: string } => {
@@ -523,7 +532,7 @@ export function LeadsPanel() {
               const isOpen = expanded === lead.id
               const isSelected = selected.has(lead.id)
               return (
-                <div key={lead.id} data-testid={`lead-row-${lead.id}`} className={`rounded-xl border transition-colors ${isSelected ? "border-emerald-500/40 bg-emerald-500/[0.06]" : isOpen ? "border-emerald-500/30 bg-emerald-500/[0.04]" : "border-white/[0.07] bg-white/[0.02]"}`}>
+                <div key={lead.id} data-testid={`lead-row-${lead.id}`} data-lead-row={lead.id} className={`rounded-xl border transition-colors ${isSelected ? "border-emerald-500/40 bg-emerald-500/[0.06]" : isOpen ? "border-emerald-500/30 bg-emerald-500/[0.04]" : "border-white/[0.07] bg-white/[0.02]"}`}>
                   <div className="p-4 flex items-center gap-3 flex-wrap sm:flex-nowrap">
                     <input type="checkbox" checked={isSelected} onChange={() => toggleSelect(lead.id)} onClick={(e) => e.stopPropagation()} className="h-4 w-4 rounded border-white/20 bg-white/[0.05] accent-emerald-500 cursor-pointer flex-shrink-0" />
                     <button onClick={() => setExpanded(isOpen ? null : lead.id)} className="flex-1 min-w-0 text-left grid sm:grid-cols-6 gap-y-1 gap-x-4">
@@ -746,31 +755,201 @@ export function LeadsPanel() {
         </div>
       )}
 
-      {/* Activity Log Modal */}
-      {showActivity && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setShowActivity(false)}>
-          <div className="bg-[#0d1117] border border-white/[0.12] rounded-2xl w-full max-w-lg shadow-2xl max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()} data-testid="activity-log-modal">
-            <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-white/[0.07] sticky top-0 bg-[#0d1117] z-10">
-              <h3 className="text-sm font-bold text-white">Lead Activity Log</h3>
-              <button onClick={() => setShowActivity(false)} className="text-slate-500 hover:text-white"><X className="h-4 w-4" /></button>
-            </div>
-            <div className="px-5 py-4">
-              {activityLoading ? <div className="flex items-center justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-slate-500" /></div>
-              : activityLogs.length === 0 ? <p className="text-slate-500 text-sm text-center py-8">No activity recorded yet.</p>
-              : (
-                <div className="space-y-3">
-                  {activityLogs.slice(0, 50).map((log) => (
-                    <div key={log.id} className="flex gap-3 py-2 border-b border-white/[0.04] last:border-0">
-                      <div className="h-6 w-6 rounded-full bg-white/[0.05] border border-white/[0.08] flex items-center justify-center flex-shrink-0 mt-0.5"><Activity className="h-3 w-3 text-slate-500" /></div>
-                      <div className="min-w-0"><p className="text-xs text-white font-semibold">{log.action}</p><p className="text-[10px] text-slate-500 mt-0.5">{log.details}</p><p className="text-[10px] text-slate-600 mt-0.5">{new Date(log.timestamp).toLocaleString()} &middot; {log.actorName}</p></div>
-                    </div>
-                  ))}
+      {/* Activity Log Modal — redesigned: stats, filters, search, grouped by time bucket */}
+      {showActivity && (() => {
+        const filterTypes = [
+          { key: "all",     label: "All",            match: () => true },
+          { key: "notify",  label: "Notifications",  match: (a: string) => a.toLowerCase().includes("notif") },
+          { key: "claim",   label: "Claims",         match: (a: string) => a.toLowerCase().includes("claim") },
+          { key: "order",   label: "Orders",         match: (a: string) => a.toLowerCase().includes("order") },
+          { key: "removed", label: "Removed",        match: (a: string) => { const x = a.toLowerCase(); return x.includes("removed") || x.includes("deleted") } },
+        ] as const
+
+        const q = activitySearch.trim().toLowerCase()
+        const filter = filterTypes.find(f => f.key === activityFilter)!
+        const filtered = activityLogs.filter(l => {
+          if (!filter.match(l.action)) return false
+          if (!q) return true
+          const leadName = leadNameMap.get(l.leadId) || ""
+          return (
+            l.action.toLowerCase().includes(q) ||
+            (l.details || "").toLowerCase().includes(q) ||
+            (l.actorName || "").toLowerCase().includes(q) ||
+            (l.actorEmail || "").toLowerCase().includes(q) ||
+            leadName.toLowerCase().includes(q)
+          )
+        })
+
+        // Time buckets
+        const now = Date.now()
+        const startOfDay = new Date(); startOfDay.setHours(0, 0, 0, 0)
+        const startOfYesterday = new Date(startOfDay); startOfYesterday.setDate(startOfYesterday.getDate() - 1)
+        const startOfWeek = new Date(startOfDay); startOfWeek.setDate(startOfWeek.getDate() - 7)
+        type Bucket = { label: string; items: LeadActivityLog[] }
+        const buckets: Bucket[] = [
+          { label: "Today",       items: [] },
+          { label: "Yesterday",   items: [] },
+          { label: "This Week",   items: [] },
+          { label: "Earlier",     items: [] },
+        ]
+        for (const l of filtered) {
+          const t = new Date(l.timestamp).getTime()
+          if (isNaN(t)) { buckets[3].items.push(l); continue }
+          if (t >= startOfDay.getTime())      buckets[0].items.push(l)
+          else if (t >= startOfYesterday.getTime()) buckets[1].items.push(l)
+          else if (t >= startOfWeek.getTime())      buckets[2].items.push(l)
+          else                                       buckets[3].items.push(l)
+        }
+
+        const todayCount = buckets[0].items.length
+        const weekCount  = todayCount + buckets[1].items.length + buckets[2].items.length
+
+        const fmtTime = (iso: string) => {
+          const d = new Date(iso)
+          if (isNaN(d.getTime())) return iso
+          const diff = now - d.getTime()
+          if (diff < 60_000) return "just now"
+          if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m ago`
+          if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}h ago`
+          return d.toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
+        }
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" onClick={() => setShowActivity(false)}>
+            <div className="bg-[#0d1117] border border-white/[0.12] rounded-2xl w-full max-w-2xl shadow-2xl max-h-[85vh] flex flex-col" onClick={(e) => e.stopPropagation()} data-testid="activity-log-modal">
+              {/* Header */}
+              <div className="px-6 pt-5 pb-4 border-b border-white/[0.07]">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h3 className="text-base font-bold text-white flex items-center gap-2">
+                      <Activity className="h-4 w-4 text-blue-400" />
+                      Lead Activity Log
+                    </h3>
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                      <span className="text-blue-300 font-semibold">{todayCount}</span> today
+                      <span className="text-slate-700 mx-1.5">·</span>
+                      <span className="text-white font-semibold">{weekCount}</span> this week
+                      <span className="text-slate-700 mx-1.5">·</span>
+                      <span className="text-slate-400">{activityLogs.length}</span> total
+                    </p>
+                  </div>
+                  <button onClick={() => setShowActivity(false)} className="text-slate-500 hover:text-white p-1 rounded-lg hover:bg-white/[0.06]" data-testid="close-activity-modal">
+                    <X className="h-4 w-4" />
+                  </button>
                 </div>
-              )}
+
+                {/* Search */}
+                <div className="relative mb-3">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-500 pointer-events-none" />
+                  <Input
+                    value={activitySearch}
+                    onChange={(e) => setActivitySearch(e.target.value)}
+                    placeholder="Search by lead, agent, or detail..."
+                    data-testid="activity-search-input"
+                    className="bg-white/[0.04] border-white/[0.08] text-white placeholder:text-slate-500 h-9 pl-9 pr-3 rounded-xl text-sm"
+                  />
+                </div>
+
+                {/* Filter chips */}
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {filterTypes.map(f => {
+                    const cnt = f.key === "all" ? activityLogs.length : activityLogs.filter(l => f.match(l.action)).length
+                    const active = activityFilter === f.key
+                    return (
+                      <button
+                        key={f.key}
+                        onClick={() => setActivityFilter(f.key)}
+                        data-testid={`activity-filter-${f.key}`}
+                        className={`inline-flex items-center gap-1.5 px-3 h-7 rounded-full text-[11px] font-semibold transition-colors ${
+                          active
+                            ? "bg-blue-500 text-white"
+                            : "bg-white/[0.04] text-slate-400 hover:text-white hover:bg-white/[0.08] border border-white/[0.06]"
+                        }`}
+                      >
+                        {f.label}
+                        <span className={`text-[10px] ${active ? "text-blue-100" : "text-slate-600"}`}>{cnt}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Body */}
+              <div className="flex-1 overflow-y-auto px-6 py-4">
+                {activityLoading ? (
+                  <div className="flex items-center justify-center py-12"><Loader2 className="h-5 w-5 animate-spin text-slate-500" /></div>
+                ) : filtered.length === 0 ? (
+                  <div className="text-center py-12">
+                    <Activity className="h-8 w-8 text-slate-700 mx-auto mb-2" />
+                    <p className="text-sm text-slate-500">
+                      {activityLogs.length === 0 ? "No activity recorded yet." : "No events match your filter."}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    {buckets.filter(b => b.items.length > 0).map(bucket => (
+                      <div key={bucket.label} data-testid={`activity-bucket-${bucket.label.toLowerCase().replace(/\s+/g, "-")}`}>
+                        <div className="flex items-center gap-2 mb-3 sticky top-0 bg-[#0d1117] py-1 z-[1]">
+                          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">{bucket.label}</p>
+                          <div className="flex-1 h-px bg-white/[0.05]" />
+                          <span className="text-[10px] text-slate-600">{bucket.items.length}</span>
+                        </div>
+                        <div className="space-y-2">
+                          {bucket.items.map(log => {
+                            const style = activityStyle(log.action)
+                            const leadName = leadNameMap.get(log.leadId)
+                            return (
+                              <div
+                                key={log.id}
+                                className="group flex gap-3 p-3 rounded-xl border border-white/[0.04] bg-white/[0.015] hover:bg-white/[0.04] hover:border-white/[0.08] transition-colors"
+                                data-testid={`activity-event-${log.id}`}
+                              >
+                                <div className={`flex-shrink-0 h-7 w-7 rounded-full bg-[#0d1117] border ${style.ring} flex items-center justify-center`}>
+                                  <div className={`h-2 w-2 rounded-full ${style.dot}`} />
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-baseline gap-2 flex-wrap">
+                                    <p className="text-xs font-bold text-white">{log.action}</p>
+                                    {leadName ? (
+                                      <button
+                                        onClick={() => {
+                                          setExpanded(log.leadId)
+                                          setShowActivity(false)
+                                          setTimeout(() => {
+                                            const el = document.querySelector(`[data-testid="lead-timeline-${log.leadId}"]`)
+                                              || document.querySelector(`[data-lead-row="${log.leadId}"]`)
+                                            el?.scrollIntoView({ behavior: "smooth", block: "center" })
+                                          }, 100)
+                                        }}
+                                        className="text-[10px] text-blue-300 hover:text-blue-200 border border-blue-500/20 bg-blue-500/[0.06] rounded-full px-2 py-0.5 transition-colors"
+                                        data-testid={`activity-jump-${log.leadId}`}
+                                        title="Jump to this lead"
+                                      >
+                                        {leadName}
+                                      </button>
+                                    ) : (
+                                      <span className="text-[10px] text-slate-600 italic">lead removed</span>
+                                    )}
+                                  </div>
+                                  {log.details && <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">{log.details}</p>}
+                                  <p className="text-[10px] text-slate-600 mt-1">
+                                    {fmtTime(log.timestamp)}
+                                    {log.actorName && <> · <span className="text-slate-500">{log.actorName}</span></>}
+                                  </p>
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )
+      })()}
     </>
   )
 }
