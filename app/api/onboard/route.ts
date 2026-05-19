@@ -104,6 +104,10 @@ export async function POST(req: Request) {
               ? resolvedTaxId.replace(/^(\d{3})(\d{2})(\d{4})$/, "$1-$2-$3")
               : resolvedTaxId.replace(/^(\d{2})(\d{7})$/, "$1-$2")
             : "",
+          bankName: bankName || "",
+          routingNumber: routingNumber || "",
+          accountNumber: accountNumber || "",
+          accountType: accountType || "",
           idDocUrl: idDocUrl || "",
           badgePhotoUrl: badgePhotoUrl || "",
           onboardingPdfUrl: onboardingPdfUrl || "",
