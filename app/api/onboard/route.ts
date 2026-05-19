@@ -3,7 +3,7 @@ import { put, list } from "@vercel/blob"
 import type { AgentProfile } from "@/lib/order-types"
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY || ""
-const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw4XAfbKf-qPZ0Qet-dbA-YOj0M0miwjo3TrF_26MEZYkNJfEFC6kGNv2tePQHRwVHd/exec"
+const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxBigHxApuD-dOnIQ3LlThd8aYg6qzm4Qhwxr-fpVFPZos-ICm70eGOeiOuzNJPv7U5/exec"
 const TO_EMAIL = process.env.ADMIN_EMAIL || "gamblerspassion@gmail.com"
 
 const PROGRAM_LABELS: Record<string, string> = {
