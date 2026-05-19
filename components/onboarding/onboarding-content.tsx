@@ -481,42 +481,7 @@ export function OnboardingContent({ token, prefill, exhibits, leadsProvided = fa
                   </p>
                 </div>
 
-                {/* ── Personal order link ── */}
-                {completedAgentId && (
-                  <div className="mt-4 rounded-2xl border-2 border-blue-200 bg-gradient-to-br from-blue-50 to-white px-5 py-5">
-                    <p className="text-[10px] uppercase tracking-[0.18em] font-bold text-blue-600 mb-1.5">Your Personal Order Link</p>
-                    <h3 className="text-base font-bold text-slate-900 mb-1">Bookmark this — it&apos;s how you submit orders</h3>
-                    <p className="text-sm text-slate-600 mb-3">Use this link whenever you close a sale. Your name and program are auto-filled, so submissions are quick.</p>
-                    <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-3 py-2.5 mb-3">
-                      <code className="flex-1 min-w-0 text-xs text-slate-700 font-mono truncate">
-                        {typeof window !== "undefined" ? `${window.location.origin}/orders?a=${completedAgentId}` : `/orders?a=${completedAgentId}`}
-                      </code>
-                      <button
-                        onClick={async () => {
-                          const url = `${window.location.origin}/orders?a=${completedAgentId}`
-                          await navigator.clipboard.writeText(url)
-                          setCopiedOrderLink(true)
-                          setTimeout(() => setCopiedOrderLink(false), 2000)
-                        }}
-                        className="flex-shrink-0 text-xs font-semibold rounded-lg px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white transition-colors"
-                      >
-                        {copiedOrderLink ? "Copied!" : "Copy"}
-                      </button>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      <Link href={`/orders?a=${completedAgentId}`}>
-                        <Button className="h-10 rounded-xl px-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm">
-                          Submit Your First Order
-                        </Button>
-                      </Link>
-                      <Link href={`/orders/history?a=${completedAgentId}`}>
-                        <Button variant="outline" className="h-10 rounded-xl px-4 border-slate-300 text-slate-700 hover:bg-slate-50 font-semibold text-sm">
-                          View Order History
-                        </Button>
-                      </Link>
-                    </div>
-                  </div>
-                )}
+
               </div>
             </div>
           </motion.div>
