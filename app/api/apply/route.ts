@@ -4,6 +4,8 @@ const RESEND_API_KEY = process.env.RESEND_API_KEY || ""
 const GOOGLE_APPLY_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzNRcZLXEry7OJZrcFO-mNSKzIcfLSXA-o7qiadL0usGla7_eqJtQHKch7Xw8dRgOmh/exec"
 const TO_EMAIL = process.env.ADMIN_EMAIL || "gamblerspassion@gmail.com"
 
+const PROVIDER_ELIGIBLE_PROGRAMS = new Set(["referral", "sales-agent", "business"])
+
 const PROGRAM_LABELS: Record<string, string> = {
   referral: "Referral Partner",
   "sales-agent": "Sales Agent",
@@ -73,7 +75,7 @@ export async function POST(req: Request) {
       ...programFields
     } = body
 
-    if (!partnerType || !firstName || !lastName || !email || !phone || typeof selectedProviders !== "string" || !selectedProviders.trim()) {
+    if (!partnerType || !firstName || !lastName || !email || !phone || typeof selectedProviders !== "string") {
       return NextResponse.json(
         { error: "Missing required fields" },
         { status: 400 }
@@ -124,6 +126,7 @@ export async function POST(req: Request) {
         state: state || "",
         company: company || "",
         program: programLabel,
+        selectedProviders: PROVIDER_ELIGIBLE_PROGRAMS.has(partnerType) ? selectedProviders.trim() : "",
         ...normalizedProgramFields,
         // Fallback summary in case script columns are changed later.
         details: programFieldSummary,
@@ -202,6 +205,10 @@ export async function POST(req: Request) {
                 <tr style="background:#1a1f2e">
                   <td style="padding:10px 16px;color:#9ca3af;font-size:14px">Phone</td>
                   <td style="padding:10px 16px;color:#fff;font-size:14px">${phone}</td>
+                </tr>
+                <tr>
+                  <td style="padding:10px 16px;color:#9ca3af;font-size:14px">Providers</td>
+                  <td style="padding:10px 16px;color:#fff;font-size:14px">${selectedProviders || "N/A"}</td>
                 </tr>
                 <tr>
                   <td style="padding:10px 16px;color:#9ca3af;font-size:14px">State</td>

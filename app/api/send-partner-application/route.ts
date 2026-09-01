@@ -3,11 +3,16 @@ import { NextResponse } from "next/server"
 const RESEND_API_KEY = process.env.RESEND_API_KEY || ""
 const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbx5yjGHJQ_hUof7SQ8FEx_vbwzvBhJLmDogYdGkkJUN0F_UH8ivZXBVIVkTLF_nC0US/exec"
 const TO_EMAIL = process.env.ADMIN_EMAIL || "gamblerspassion@gmail.com"
+const PROVIDER_ELIGIBLE_TYPES = new Set(["referral", "sales-agent", "business-partnership"])
 
 export async function POST(req: Request) {
   try {
     const body = await req.json()
-    const { firstName, lastName, email, phone, company, partnerType, selectedProviders, experience, state, message } = body
+    const { firstName, lastName, email, phone, company, partnershipType: partnerType, selectedProviders, experience, state, message } = body
+
+    if (!firstName || !lastName || !email || !partnerType || (PROVIDER_ELIGIBLE_TYPES.has(partnerType) && (!selectedProviders || !selectedProviders.trim()))) {
+      return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
+    }
 
     const name = `${firstName} ${lastName}`.trim()
 

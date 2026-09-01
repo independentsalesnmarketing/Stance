@@ -54,6 +54,8 @@ const partnershipTypes = [
   },
 ]
 
+const PROVIDER_ELIGIBLE_TYPES = ["referral", "sales-agent", "business-partnership"]
+
 const providerLogos = [
   { name: "Frontier", src: "/images/frontier-logo.png" },
   { name: "AT&T", src: "/images/att-logo.png" },
@@ -85,6 +87,7 @@ export function PartnerApplication() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSubmitted, setIsSubmitted] = useState(false)
   const [error, setError] = useState("")
+  const providersRequired = PROVIDER_ELIGIBLE_TYPES.includes(formData.partnershipType)
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
@@ -95,8 +98,8 @@ export function PartnerApplication() {
     e.preventDefault()
     setError("")
 
-    if (!formData.name || !formData.email || !formData.company || !formData.selectedProviders) {
-      setError("Please fill in all required fields and select at least one provider.")
+    if (!formData.name || !formData.email || !formData.company || (providersRequired && !formData.selectedProviders)) {
+      setError(providersRequired ? "Please fill in all required fields and select at least one provider." : "Please fill in all required fields.")
       return
     }
 
@@ -235,7 +238,7 @@ export function PartnerApplication() {
                         <button
                           key={type.id}
                           type="button"
-                          onClick={() => setFormData((prev) => ({ ...prev, partnershipType: type.id }))}
+                          onClick={() => setFormData((prev) => ({ ...prev, partnershipType: type.id, selectedProviders: PROVIDER_ELIGIBLE_TYPES.includes(type.id) ? prev.selectedProviders : "" }))}
                           className={`text-left p-4 border-2 rounded-lg transition-all duration-200 ${
                             isSelected
                               ? "border-green-500 bg-green-500/10"
@@ -266,7 +269,7 @@ export function PartnerApplication() {
                 </div>
 
                 {/* Provider Selector */}
-                <fieldset>
+                {providersRequired && <fieldset>
                   <legend className="block text-sm font-semibold text-gray-200 mb-4 uppercase tracking-wider">
                     Providers you want to represent <span className="text-red-400">*</span>
                   </legend>
@@ -292,7 +295,7 @@ export function PartnerApplication() {
                       )
                     })}
                   </div>
-                </fieldset>
+                </fieldset>}
 
                 {/* Form fields */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

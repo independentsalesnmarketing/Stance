@@ -66,6 +66,8 @@ interface FormValues {
 
 // ── Program Configurations ─────────────────────────────────────────
 
+const PROVIDER_ELIGIBLE_ROLES: PartnerType[] = ["referral", "sales-agent", "business"]
+
 const providerLogos = [
   { name: "Frontier", src: "/images/frontier-logo.png" },
   { name: "AT&T", src: "/images/att-logo.png" },
@@ -222,7 +224,7 @@ function formatPhone(raw: string): string {
   return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`
 }
 
-// ── Component ──────────────────────────────────────────────────────
+// ── Component ──────────────────────────��───────────────────────────
 
 export function ApplyContent() {
   const [started, setStarted] = useState(false)
@@ -243,6 +245,7 @@ export function ApplyContent() {
   const [isComplete, setIsComplete] = useState(false)
 
   const selectedProgram = PROGRAMS.find((p) => p.id === formData.partnerType)
+  const providersRequired = PROVIDER_ELIGIBLE_ROLES.includes(formData.partnerType as PartnerType)
 
   const updateField = useCallback(
     (name: string, value: string) => {
@@ -263,7 +266,7 @@ export function ApplyContent() {
 
     if (step === 1) {
       if (!formData.partnerType) newErrors.partnerType = "Select a program"
-      if (!formData.selectedProviders.trim()) newErrors.selectedProviders = "Select at least one provider"
+      if (providersRequired && !formData.selectedProviders.trim()) newErrors.selectedProviders = "Select at least one provider"
       if (!formData.firstName.trim()) newErrors.firstName = "Required"
       if (!formData.lastName.trim()) newErrors.lastName = "Required"
       if (!formData.email.trim()) {
@@ -313,7 +316,7 @@ export function ApplyContent() {
     if (step === 1) {
       return !!(
         formData.partnerType &&
-        formData.selectedProviders.trim() &&
+        (!providersRequired || formData.selectedProviders.trim()) &&
         formData.firstName.trim() &&
         formData.lastName.trim() &&
         /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email) &&
@@ -790,7 +793,7 @@ function StepInfoAndProgram({
       </div>
 
       {/* Provider selector */}
-      <fieldset>
+      {providersRequired && <fieldset>
         <legend className="text-sm font-semibold text-slate-900 mb-3">Providers you want to represent <span className="text-red-500">*</span></legend>
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
           {providerLogos.map((provider) => {
@@ -810,7 +813,7 @@ function StepInfoAndProgram({
           })}
         </div>
         {errors.selectedProviders && <p className="text-red-500 text-xs mt-1.5">{errors.selectedProviders}</p>}
-      </fieldset>
+      </fieldset>}
 
       {/* Divider */}
       <div className="border-t border-slate-200" />
