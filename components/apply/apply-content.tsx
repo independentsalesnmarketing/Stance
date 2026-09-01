@@ -224,7 +224,7 @@ function formatPhone(raw: string): string {
   return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`
 }
 
-// ── Component ──────────────────────────��───────────────────────────
+// ���─ Component ──────────────────────────��───────────────────────────
 
 export function ApplyContent() {
   const [started, setStarted] = useState(false)
@@ -686,7 +686,7 @@ export function ApplyContent() {
               transition={{ duration: 0.25, ease: "easeInOut" }}
             >
               {step === 1 && (
-                <StepInfoAndProgram formData={formData} errors={errors} onChange={updateField} />
+                <StepInfoAndProgram formData={formData} errors={errors} onChange={updateField} providersRequired={providersRequired} />
               )}
               {step === 2 && selectedProgram && (
                 <StepProgramDetails program={selectedProgram} formData={formData} errors={errors} onChange={updateField} />
@@ -746,10 +746,12 @@ function StepInfoAndProgram({
   formData,
   errors,
   onChange,
+  providersRequired,
 }: {
   formData: FormValues
   errors: Record<string, string>
   onChange: (name: string, value: string) => void
+  providersRequired: boolean
 }) {
   return (
     <div className="space-y-8">
