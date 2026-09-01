@@ -69,10 +69,11 @@ export async function POST(req: Request) {
       phone,
       state,
       company,
+      selectedProviders,
       ...programFields
     } = body
 
-    if (!partnerType || !firstName || !lastName || !email || !phone) {
+    if (!partnerType || !firstName || !lastName || !email || !phone || typeof selectedProviders !== "string" || !selectedProviders.trim()) {
       return NextResponse.json(
         { error: "Missing required fields" },
         { status: 400 }

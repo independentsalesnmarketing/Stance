@@ -12,6 +12,7 @@ import Image from "next/image"
 
 type FormData = {
   name: string
+  selectedProviders: string
   email: string
   company: string
   phone: string
@@ -72,6 +73,7 @@ export function PartnerApplication() {
 
   const [formData, setFormData] = useState<FormData>({
     name: "",
+    selectedProviders: "",
     email: "",
     company: "",
     phone: "",
@@ -89,12 +91,12 @@ export function PartnerApplication() {
     setFormData((prev) => ({ ...prev, [name]: value }))
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError("")
 
-    if (!formData.name || !formData.email || !formData.company) {
-      setError("Please fill in all required fields")
+    if (!formData.name || !formData.email || !formData.company || !formData.selectedProviders) {
+      setError("Please fill in all required fields and select at least one provider.")
       return
     }
 
@@ -106,14 +108,30 @@ export function PartnerApplication() {
 
     setIsSubmitting(true)
 
-    setTimeout(() => {
-      setIsSubmitting(false)
+    try {
+      const res = await fetch("/api/send-partner-application", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData),
+      })
+      if (!res.ok) throw new Error("Unable to submit application")
       setIsSubmitted(true)
+      setTimeout(() => {
+        setIsSubmitted(false)
+        setFormData({ name: "", selectedProviders: "", email: "", company: "", phone: "", website: "", partnershipType: "", message: "" })
+      }, 5000)
+    } catch {
+      setError("Unable to submit application. Please try again.")
+    } finally {
+      setIsSubmitting(false)
+    }
 
+    if (isSubmitted) {
       setTimeout(() => {
         setIsSubmitted(false)
         setFormData({
           name: "",
+          selectedProviders: "",
           email: "",
           company: "",
           phone: "",
@@ -122,7 +140,7 @@ export function PartnerApplication() {
           message: "",
         })
       }, 5000)
-    }, 1500)
+    }
   }
 
   return (
@@ -246,6 +264,35 @@ export function PartnerApplication() {
                     })}
                   </div>
                 </div>
+
+                {/* Provider Selector */}
+                <fieldset>
+                  <legend className="block text-sm font-semibold text-gray-200 mb-4 uppercase tracking-wider">
+                    Providers you want to represent <span className="text-red-400">*</span>
+                  </legend>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+                    {providerLogos.map((provider) => {
+                      const selected = formData.selectedProviders.split(",").filter(Boolean).includes(provider.name)
+                      return (
+                        <label key={provider.name} className={`cursor-pointer rounded-lg border-2 p-2 transition-colors ${selected ? "border-green-500 bg-green-500/10" : "border-gray-700 bg-black hover:border-gray-500"}`}>
+                          <input
+                            type="checkbox"
+                            className="sr-only"
+                            checked={selected}
+                            onChange={() => setFormData((prev) => {
+                              const providers = prev.selectedProviders.split(",").filter(Boolean)
+                              const next = selected ? providers.filter((name) => name !== provider.name) : [...providers, provider.name]
+                              return { ...prev, selectedProviders: next.join(",") }
+                            })}
+                          />
+                          <span className="flex h-10 items-center justify-center gap-2 text-xs font-semibold text-white">
+                            <img src={provider.src} alt={`${provider.name} logo`} className="h-6 w-auto max-w-[80px] object-contain" />
+                          </span>
+                        </label>
+                      )
+                    })}
+                  </div>
+                </fieldset>
 
                 {/* Form fields */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

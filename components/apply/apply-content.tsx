@@ -54,6 +54,7 @@ interface FieldConfig {
 
 interface FormValues {
   partnerType: PartnerType | ""
+  selectedProviders: string
   firstName: string
   lastName: string
   email: string
@@ -64,6 +65,19 @@ interface FormValues {
 }
 
 // ── Program Configurations ─────────────────────────────────────────
+
+const providerLogos = [
+  { name: "Frontier", src: "/images/frontier-logo.png" },
+  { name: "AT&T", src: "/images/att-logo.png" },
+  { name: "Verizon", src: "/images/verizon-logo.png" },
+  { name: "Spectrum", src: "/images/spectrum-logo.png" },
+  { name: "T-Mobile", src: "/images/tmobile-fiber-logo.png" },
+  { name: "Optimum", src: "/images/optimum-logo.png" },
+  { name: "Brightspeed", src: "/images/brightspeed-logo.png" },
+  { name: "Kinetic", src: "/images/kinetic-logo.png" },
+  { name: "EarthLink", src: "/images/earthlink-logo.png" },
+  { name: "Altafiber", src: "/images/altafiber-logo.png" },
+]
 
 const PROGRAMS: ProgramOption[] = [
   {
@@ -216,6 +230,7 @@ export function ApplyContent() {
   const [direction, setDirection] = useState(1)
   const [formData, setFormData] = useState<FormValues>({
     partnerType: "",
+    selectedProviders: "",
     firstName: "",
     lastName: "",
     email: "",
@@ -248,6 +263,7 @@ export function ApplyContent() {
 
     if (step === 1) {
       if (!formData.partnerType) newErrors.partnerType = "Select a program"
+      if (!formData.selectedProviders.trim()) newErrors.selectedProviders = "Select at least one provider"
       if (!formData.firstName.trim()) newErrors.firstName = "Required"
       if (!formData.lastName.trim()) newErrors.lastName = "Required"
       if (!formData.email.trim()) {
@@ -297,6 +313,7 @@ export function ApplyContent() {
     if (step === 1) {
       return !!(
         formData.partnerType &&
+        formData.selectedProviders.trim() &&
         formData.firstName.trim() &&
         formData.lastName.trim() &&
         /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email) &&
@@ -771,6 +788,29 @@ function StepInfoAndProgram({
         </div>
         {errors.partnerType && <p className="text-red-500 text-xs mt-1.5">{errors.partnerType}</p>}
       </div>
+
+      {/* Provider selector */}
+      <fieldset>
+        <legend className="text-sm font-semibold text-slate-900 mb-3">Providers you want to represent <span className="text-red-500">*</span></legend>
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+          {providerLogos.map((provider) => {
+            const selected = formData.selectedProviders.split(",").filter(Boolean).includes(provider.name)
+            return (
+              <label key={provider.name} className={`cursor-pointer rounded-xl border-2 p-2 transition-colors ${selected ? "border-red-500 bg-red-50" : "border-slate-200 bg-white hover:border-slate-300"}`}>
+                <input type="checkbox" className="sr-only" checked={selected} onChange={() => {
+                  const providers = formData.selectedProviders.split(",").filter(Boolean)
+                  const next = selected ? providers.filter((name) => name !== provider.name) : [...providers, provider.name]
+                  onChange("selectedProviders", next.join(","))
+                }} />
+                <span className="flex h-10 items-center justify-center">
+                  <img src={provider.src} alt={`${provider.name} logo`} className="h-6 w-auto max-w-[80px] object-contain" />
+                </span>
+              </label>
+            )
+          })}
+        </div>
+        {errors.selectedProviders && <p className="text-red-500 text-xs mt-1.5">{errors.selectedProviders}</p>}
+      </fieldset>
 
       {/* Divider */}
       <div className="border-t border-slate-200" />
