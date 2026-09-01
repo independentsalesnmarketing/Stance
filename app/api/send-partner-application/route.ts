@@ -7,7 +7,7 @@ const TO_EMAIL = process.env.ADMIN_EMAIL || "gamblerspassion@gmail.com"
 export async function POST(req: Request) {
   try {
     const body = await req.json()
-    const { firstName, lastName, email, phone, company, partnerType, experience, state, message } = body
+    const { firstName, lastName, email, phone, company, partnerType, selectedProviders, experience, state, message } = body
 
     const name = `${firstName} ${lastName}`.trim()
 
@@ -23,6 +23,7 @@ export async function POST(req: Request) {
           phone: phone || "",
           company: company || "",
           partnerType: partnerType || "",
+          selectedProviders: selectedProviders || "",
           state: state || "",
           experience: experience || "",
           notes: message || "",
@@ -52,7 +53,8 @@ export async function POST(req: Request) {
             <tr><td><strong>Phone</strong></td><td>${phone || "N/A"}</td></tr>
             <tr style="background:#f9f9f9"><td><strong>Company</strong></td><td>${company || "N/A"}</td></tr>
             <tr><td><strong>Partnership Type</strong></td><td>${partnerType}</td></tr>
-            <tr style="background:#f9f9f9"><td><strong>State</strong></td><td>${state || "N/A"}</td></tr>
+            <tr style="background:#f9f9f9"><td><strong>Providers</strong></td><td>${selectedProviders || "N/A"}</td></tr>
+            <tr><td><strong>State</strong></td><td>${state || "N/A"}</td></tr>
             <tr><td><strong>Experience</strong></td><td>${experience || "N/A"}</td></tr>
             <tr style="background:#f9f9f9"><td><strong>Notes</strong></td><td>${message || "N/A"}</td></tr>
           </table>
