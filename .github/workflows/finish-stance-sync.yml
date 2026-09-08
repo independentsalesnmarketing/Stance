@@ -1,0 +1,53 @@
+name: Finish Stance source sync
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/finish-stance-sync.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download and verify current Stance package
+        shell: bash
+        run: |
+          set -euo pipefail
+          PACKAGE_URL='https://pub-d878b359349744cc8e5cabf76389a870.r2.dev/deploy/stance-github-patch-safe-2026-09-08.zip'
+          EXPECTED_SHA='10b390c758158e80fc30357ec0af4ccfc8afeddf2a5f903c099a0c92e02e8e7c'
+          curl -fL --retry 4 --retry-all-errors "$PACKAGE_URL" -o /tmp/stance-current.zip
+          ACTUAL_SHA="$(sha256sum /tmp/stance-current.zip | awk '{print $1}')"
+          test "$ACTUAL_SHA" = "$EXPECTED_SHA"
+          rm -rf /tmp/stance-current
+          mkdir -p /tmp/stance-current
+          unzip -q /tmp/stance-current.zip -d /tmp/stance-current
+
+      - name: Replace repository with verified current package
+        shell: bash
+        run: |
+          set -euo pipefail
+          rsync -a --delete --exclude='.git/' /tmp/stance-current/ ./
+          git status --short
+
+      - name: Commit and push exact current Stance source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'Stance Sync'
+          git config user.email 'actions@users.noreply.github.com'
+          git add -A
+          if git diff --cached --quiet; then
+            echo 'Repository already matches the verified package.'
+            exit 0
+          fi
+          git commit -m 'Sync verified Stance R2 production source'
+          git push origin HEAD:main
