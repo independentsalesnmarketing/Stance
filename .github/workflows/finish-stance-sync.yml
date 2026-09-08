@@ -35,7 +35,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          rsync -a --delete --exclude='.git/' /tmp/stance-current/ ./
+          rsync -a --delete --exclude='.git/' --exclude='.github/' /tmp/stance-current/ ./
           git status --short
 
       - name: Commit and push exact current Stance source
